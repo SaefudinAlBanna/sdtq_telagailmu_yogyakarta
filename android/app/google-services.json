@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "914023365184",
+    "project_id": "sdtq-telagailmu-yogyakarta",
+    "storage_bucket": "sdtq-telagailmu-yogyakarta.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:914023365184:android:0a7258da6d169e3729bda5",
+        "android_client_info": {
+          "package_name": "com.sdtq_telagailmu_yogyakarta.sdtq_telagailmu_yogyakarta"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDwu8AZo59mDCHI6QCKRFacAlM82DnCf2k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
