@@ -1,45 +1,3 @@
-
-// ========== KODE BARU =================
-
-// Baik! Dengan kode controller yang lengkap, kita bisa membuat saran yang lebih terintegrasi dan akurat. Mari kita percantik tampilan dan tingkatkan kemudahan penggunaan aplikasi Flutter Anda.
-// Saya akan menggunakan pendekatan yang sama seperti sebelumnya, yaitu memecah UI menjadi komponen yang lebih kecil, menggunakan tema, memperbaiki tata letak, dan memastikan interaksi pengguna lebih jelas, sambil menyesuaikan dengan logika di PemberianNilaiHalaqohController.
-// Perubahan Utama pada PemberianNilaiHalaqohController.dart:
-// State Loading: Tambahkan RxBool isLoading = false.obs; untuk mengelola status loading saat tombol simpan ditekan.
-// Error Handling pada ambilDataUmi: Kembalikan pesan yang lebih informatif atau null jika data tidak ditemukan, dan tangani di FutureBuilder.
-// Validasi Input: Buat fungsi String? validateInput() untuk memusatkan logika validasi.
-// Logika simpanNilai:
-// Gunakan isLoading untuk disable tombol saat proses.
-// Panggil validateInput sebelum menyimpan.
-// Berikan feedback (Snackbar) yang lebih baik untuk sukses atau error.
-// Pastikan tipe data yang disimpan ke Firestore sesuai (misalnya, nilai sebagai int).
-// Tangani kasus update nilai dengan dialog konfirmasi yang fungsional.
-// Penamaan Variabel dan Konstanta: Gunakan konstanta untuk idSekolah jika tidak berubah atau dapatkan dari konfigurasi.
-// Membersihkan Field: Buat method _clearFields() untuk membersihkan input setelah berhasil simpan (opsional, tergantung kebutuhan UX).
-// Dispose Controller: Pastikan semua TextEditingController di-dispose di onClose().
-// Get.arguments: Akses dengan aman dan pastikan tipenya.
-// Perubahan Utama pada PemberianNilaiHalaqohView.dart:
-// Theming: Gunakan Theme.of(context) dan Theme.of(context).colorScheme secara konsisten.
-// Struktur & Layout:
-// Gunakan LayoutBuilder untuk responsivitas pada bagian info siswa dan pengampu.
-// Gunakan Card dengan styling yang lebih baik (elevation, shape, padding).
-// Gunakan SizedBox untuk spacing yang konsisten.
-// Buat widget helper untuk judul section.
-// Input Fields:
-// Gunakan InputDecoration yang seragam (misalnya, OutlineInputBorder, labelText, filled).
-// Perbaiki DropdownSearch (items, popupProps, decorator).
-// Batasi input nilai dengan LengthLimitingTextInputFormatter dan validasi angka.
-// Radio Buttons:
-// Gunakan RadioListTile untuk tampilan yang lebih baik dan terintegrasi.
-// Tampilkan deskripsi lengkap (value dari radio) sebagai subtitle.
-// Tombol Simpan:
-// Ganti FloatingActionButton dengan ElevatedButton full-width.
-// Tampilkan CircularProgressIndicator pada tombol saat controller.isLoading.value adalah true.
-// Feedback Pengguna: Gunakan Get.snackbar dengan styling yang jelas untuk sukses, peringatan, dan error.
-// GestureDetector: Untuk menutup keyboard saat tap di luar field.
-// Berikut adalah kode yang telah direvisi:
-// PemberianNilaiHalaqohController.dart (Revisi)
-
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -50,217 +8,221 @@ class PemberianNilaiHalaqohController extends GetxController {
   // --- State Observables ---
   final RxString keteranganHalaqoh = "".obs;
   final RxBool isLoading = false.obs;
+  final RxString selectedSuratSabaq = ''.obs;
+  final RxString selectedNilaiSabaq = ''.obs;
+  final RxString selectedSuratSabqi = ''.obs;
+  final RxString selectedNilaiSabqi = ''.obs;
+  final RxString selectedSuratManzil = ''.obs;
+  final RxString selectedNilaiManzil = ''.obs;
+  final RxString selectedNilaiTugas = ''.obs;
 
   // --- Text Editing Controllers ---
-  late TextEditingController suratsabaqC;
   late TextEditingController sabaqC;
-  late TextEditingController nilaisabaqC;
-  late TextEditingController suratsabqiC;
   late TextEditingController sabqiC;
-  late TextEditingController nilaisabqiC;
-  late TextEditingController suratmanzilC;
   late TextEditingController manzilC;
-  late TextEditingController nilaimanzilC;
   late TextEditingController tugasTambahanC;
-  late TextEditingController nilaiTugasTambahanC;
-  
-  // late TextEditingController keteranganGuruC; // Jika ada field custom, uncomment
 
-  // late final Map<String, dynamic> dataArgs;
-
-  // --- Firebase Instances ---
+  // --- Firebase & Data ---
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  // --- Data from Arguments ---
-  // Akan diinisialisasi di onInit dari Get.arguments
   Map<String, dynamic> dataArgs = {};
-
-  // --- Constants (bisa dipindah ke file konfigurasi) ---
   static const String _defaultIdSekolah = 'P9984539';
 
   // --- Getters ---
   String get _currentUserId => _auth.currentUser!.uid;
   String get _currentUserEmail => _auth.currentUser!.email!;
-  String get _idSekolah => dataArgs['id_sekolah'] ?? _defaultIdSekolah; // Contoh jika id_sekolah bisa dari args
+  String get _idSekolah => dataArgs['id_sekolah'] ?? _defaultIdSekolah;
 
-   @override
+  @override
   void onInit() {
     super.onInit();
-    // Pastikan Get.arguments adalah Map<String, dynamic> atau tangani kasus lain
     final arguments = Get.arguments;
     if (arguments is Map<String, dynamic>) {
-      dataArgs = arguments; // <--- UBAH INI
+      dataArgs = arguments;
     } else {
-      // Handle jika argumen tidak sesuai, misal dengan nilai default atau error
-      dataArgs = {}; // Atau lempar error, atau navigasi kembali
+      dataArgs = {};
       Get.snackbar("Error", "Data navigasi tidak valid.", backgroundColor: Colors.red);
     }
-    // Inisialisasi controller lain yang mungkin bergantung pada dataArgs
-    suratsabaqC = TextEditingController(text: dataArgs['initial_surat'] ?? '');
     sabaqC = TextEditingController();
-    nilaisabaqC = TextEditingController();
-    suratsabqiC = TextEditingController();
     sabqiC = TextEditingController();
-    nilaisabqiC = TextEditingController();
-    suratmanzilC = TextEditingController();
     manzilC = TextEditingController();
-    nilaimanzilC = TextEditingController();
     tugasTambahanC = TextEditingController();
-    nilaiTugasTambahanC = TextEditingController();
   }
 
   void onChangeKeterangan(String? catatan) {
     if (catatan != null) {
       keteranganHalaqoh.value = catatan;
-      // if (keteranganGuruC.text.isNotEmpty) { // Jika ada field custom
-      //   keteranganGuruC.clear();
-      // }
     }
   }
+
+  // Future<String?> ambilDataAlHusna() async {
+  //   if (dataArgs.isEmpty || dataArgs['tahunajaran'] == null) {
+  //     return "Data siswa tidak lengkap";
+  //   }
+  //   String idTahunAjaranRaw = dataArgs['tahunajaran'];
+  //   String idTahunAjaran = idTahunAjaranRaw.replaceAll("/", "-");
+  //   try {
+  //     QuerySnapshot<Map<String, dynamic>> snapSemesterSiswa = await _firestore
+  //         .collection('Sekolah').doc(_idSekolah)
+  //         .collection('tahunajaran').doc(idTahunAjaran)
+  //         .collection('kelompokmengaji').doc(dataArgs['fase'])
+  //         .collection('pengampu').doc(dataArgs['namapengampu'])
+  //         .collection('daftarsiswa').doc(dataArgs['nisn'])
+  //         .collection('semester')
+  //         .limit(1)
+  //         .get();
+  //     if (snapSemesterSiswa.docs.isNotEmpty) {
+  //       Map<String, dynamic> dataSemester = snapSemesterSiswa.docs.first.data();
+  //       return dataSemester['alhusna'] as String? ?? "Belum diinput";
+  //     }
+  //     return "Belum diinput";
+  //   } catch (e) {
+  //     return "Gagal memuat data";
+  //   }
+  // }
 
   Future<String?> ambilDataAlHusna() async {
-    if (dataArgs.isEmpty || dataArgs['tahunajaran'] == null) {
-      // print("Error: Data arguments tidak lengkap untuk ambilDataUmi");
-      return "Data siswa tidak lengkap";
-    }
-
-    String idTahunAjaranRaw = dataArgs['tahunajaran'];
-    String idTahunAjaran = idTahunAjaranRaw.replaceAll("/", "-");
-
-    try {
-      // Path disesuaikan dengan asumsi 'namaSemester' adalah ID unik per siswa di bawah collection 'semester'
-      // atau kita perlu mengambil dokumen semester yang relevan.
-      // Kode asli mengambil `snapSemester.docs.first.data()`, mengasumsikan ada satu dokumen.
-      QuerySnapshot<Map<String, dynamic>> snapSemesterSiswa = await _firestore
-          .collection('Sekolah').doc(_idSekolah)
-          .collection('tahunajaran').doc(idTahunAjaran)
-          .collection('kelompokmengaji').doc(dataArgs['fase'])
-          .collection('pengampu').doc(dataArgs['namapengampu'])
-          // .collection('tempat').doc(dataArgs['tempatmengaji'])
-          .collection('daftarsiswa').doc(dataArgs['nisn'])
-          .collection('semester')
-          .limit(1) // Ambil dokumen semester terakhir/aktif
-          .get();
-
-      if (snapSemesterSiswa.docs.isNotEmpty) {
-        Map<String, dynamic> dataSemester = snapSemesterSiswa.docs.first.data();
-        return dataSemester['alhusna'] as String? ?? "Belum diinput";
-      }
-      return "Belum diinput"; // Jika tidak ada dokumen semester
-    } catch (e) {
-      // print("Error ambilDataUmi: $e");
-      return "Gagal memuat data";
-    }
+  // 1. Validasi awal data arguments
+  if (dataArgs.isEmpty || dataArgs['tahunajaran'] == null || dataArgs['nisn'] == null) {
+    // print("Debug: Argumen tidak lengkap -> tahunajaran: ${dataArgs['tahunajaran']}, nisn: ${dataArgs['nisn']}");
+    return "Data Argumen Tidak Lengkap";
   }
 
+  try {
+    // 2. Persiapkan variabel dengan aman
+    final String tahunAjaranRaw = dataArgs['tahunajaran'];
+    final String idTahunAjaran = tahunAjaranRaw.replaceAll("/", "-");
+    final String fase = dataArgs['fase'] ?? 'fase-kosong';
+    final String namaPengampu = dataArgs['namapengampu'] ?? 'pengampu-kosong';
+    final String nisn = dataArgs['nisn'];
+
+    // Baris ini bisa Anda uncomment untuk debugging di console
+    // print("Debug: Mencari capaian di path -> .../tahunajaran/$idTahunAjaran/kelompokmengaji/$fase/pengampu/$namaPengampu/daftarsiswa/$nisn/semester");
+
+    // 3. Buat kueri yang KONSISTEN dengan simpanNilai
+    final QuerySnapshot<Map<String, dynamic>> snapSemesterSiswa = await _firestore
+        .collection('Sekolah').doc(_idSekolah)
+        .collection('tahunajaran').doc(idTahunAjaran)
+        .collection('kelompokmengaji').doc(fase)
+        .collection('pengampu').doc(namaPengampu)
+        .collection('daftarsiswa').doc(nisn)
+        .collection('semester')
+        .orderBy('tanggalinput', descending: true) // <-- PERBAIKAN UTAMA: Selalu urutkan!
+        .limit(1)
+        .get();
+
+    // 4. Proses hasil kueri
+    if (snapSemesterSiswa.docs.isNotEmpty) {
+      final Map<String, dynamic> dataSemester = snapSemesterSiswa.docs.first.data();
+      
+      // Ambil nilai 'alhusna' dan cek jika null atau bukan string
+      final capaian = dataSemester['alhusna'];
+      
+      if (capaian != null && capaian is String && capaian.isNotEmpty) {
+        return capaian;
+      } else {
+        // Ini terjadi jika field 'alhusna' ada tapi kosong atau null
+        return "Capaian Belum Diisi";
+      }
+    } else {
+      // Ini terjadi jika TIDAK ADA dokumen semester sama sekali
+      return "Semester Tidak Ditemukan";
+    }
+
+  } catch (e) {
+    // print("Error di ambilDataAlHusna: $e");
+    return "Error: Gagal Memuat";
+  }
+}
+
   String? _validateInput() {
-    if (sabaqC.text.trim().isEmpty) return 'sabaq masih kosong';
-    if (nilaisabaqC.text.trim().isEmpty) return 'Nilai sabaq masih kosong';
-    if (sabqiC.text.trim().isEmpty) return 'sabqi masih kosong';
-    if (nilaisabqiC.text.trim().isEmpty) return 'Nilai sabqi masih kosong';
+    if (sabaqC.text.trim().isEmpty) return 'Sabaq masih kosong';
+    if (selectedNilaiSabaq.value.isEmpty) return 'Nilai sabaq masih kosong';
+    if (sabqiC.text.trim().isEmpty) return 'Sabqi masih kosong';
+    if (selectedNilaiSabqi.value.isEmpty) return 'Nilai sabqi masih kosong';
     if (manzilC.text.trim().isEmpty) return 'Manzil masih kosong';
-    if (nilaimanzilC.text.trim().isEmpty) return 'Nilai manzil masih kosong';
+    if (selectedNilaiManzil.value.isEmpty) return 'Nilai manzil masih kosong';
     if (tugasTambahanC.text.trim().isEmpty) return 'Tugas tambahan masih kosong';
-    if (nilaiTugasTambahanC.text.trim().isEmpty) return 'Nilai tugas tambahan masih kosong';
-    // final int? nilai = int.tryParse(nilaiC.text);
-    // if (nilai == null || nilai < 0 || nilai > 100) return 'Nilai harus antara 0 dan 100';
-    // if (keteranganHalaqoh.value.isEmpty /* && keteranganGuruC.text.trim().isEmpty */) 
-    // {
-    //   return 'Keterangan pengampu masih kosong';
-    // }
+    if (selectedNilaiTugas.value.isEmpty) return 'Nilai tugas tambahan masih kosong';
+    if (keteranganHalaqoh.value.isEmpty) return 'Keterangan pengampu masih kosong';
     return null;
   }
 
   Future<void> simpanNilai() async {
     final validationError = _validateInput();
     if (validationError != null) {
-      Get.snackbar('Peringatan', validationError,
-          backgroundColor: Colors.orange.shade700, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar('Peringatan', validationError, backgroundColor: Colors.orange.shade700, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
       return;
     }
 
     isLoading.value = true;
 
-    if (dataArgs.isEmpty) {
-      Get.snackbar('Error', 'Data siswa tidak lengkap untuk penyimpanan.',
-          backgroundColor: Colors.red.shade700, colorText: Colors.white);
-      isLoading.value = false;
-      return;
-    }
-
     try {
-      String idTahunAjaranRaw = dataArgs['tahunajaran'];
-      String idTahunAjaran = idTahunAjaranRaw.replaceAll("/", "-");
-      DateTime now = DateTime.now();
-      String docIdNilaiHarian = DateFormat('dd-MM-yyyy').format(now); // ID untuk nilai harian
+      // --- PERUBAHAN KUNCI: Validasi data penting sebelum digunakan ---
+      final dynamic tahunAjaranRaw = dataArgs['tahunajaran'];
+      if (tahunAjaranRaw == null || tahunAjaranRaw is! String || tahunAjaranRaw.isEmpty) {
+        throw Exception("Data 'tahunajaran' untuk siswa ini tidak valid atau hilang.");
+      }
+      final nisnSiswa = dataArgs['nisn'];
+      if (nisnSiswa == null || nisnSiswa is! String || nisnSiswa.isEmpty) {
+          throw Exception("Data 'NISN' siswa ini tidak valid atau hilang.");
+      }
+      // --- Akhir Perubahan Kunci ---
 
-      // Ambil data semester siswa (termasuk namaSemester dan UMI terakhir)
-      DocumentSnapshot<Map<String, dynamic>>? docSemesterSiswa;
+      String idTahunAjaran = tahunAjaranRaw.replaceAll("/", "-");
+      DateTime now = DateTime.now();
+      String docIdNilaiHarian = DateFormat('dd-MM-yyyy').format(now);
+
       QuerySnapshot<Map<String, dynamic>> snapSemesterSiswa = await _firestore
           .collection('Sekolah').doc(_idSekolah)
           .collection('tahunajaran').doc(idTahunAjaran)
-          .collection('kelompokmengaji').doc(dataArgs['fase'])
-          .collection('pengampu').doc(dataArgs['namapengampu'])
-          // .collection('tempat').doc(dataArgs['tempatmengaji'])
-          .collection('daftarsiswa').doc(dataArgs['nisn'])
+          .collection('kelompokmengaji').doc(dataArgs['fase'] ?? 'fase-kosong')
+          .collection('pengampu').doc(dataArgs['namapengampu'] ?? 'pengampu-kosong')
+          .collection('daftarsiswa').doc(nisnSiswa)
           .collection('semester')
-          .orderBy('tanggalinput', descending: true) // Asumsi ada field timestamp
+          .orderBy('tanggalinput', descending: true)
           .limit(1)
           .get();
 
-      String namaSemester;
-      String alhusnaSaatIni;
-
-      if (snapSemesterSiswa.docs.isNotEmpty) {
-          docSemesterSiswa = snapSemesterSiswa.docs.first;
-          namaSemester = docSemesterSiswa.data()?['namasemester'] ?? "Semester Tidak Diketahui";
-          alhusnaSaatIni = docSemesterSiswa.data()?['alhusna'] ?? "al-husna Tidak Diketahui";
-      } else {
-          // Handle jika tidak ada data semester, mungkin perlu dibuat dulu atau error
-          Get.snackbar('Error', 'Data semester siswa tidak ditemukan.',
-              backgroundColor: Colors.red.shade700, colorText: Colors.white);
-          isLoading.value = false;
-          return;
+      if (snapSemesterSiswa.docs.isEmpty) {
+        throw Exception("Data semester siswa tidak ditemukan. Tidak bisa menyimpan nilai.");
       }
+      
+      DocumentSnapshot<Map<String, dynamic>> docSemesterSiswa = snapSemesterSiswa.docs.first;
+      String namaSemester = docSemesterSiswa.data()?['namasemester'] ?? "Semester Tidak Diketahui";
+      String alhusnaSaatIni = docSemesterSiswa.data()?['alhusna'] ?? "Al-Husna Tidak Diketahui";
+      
+      DocumentReference<Map<String, dynamic>> docNilaiRef = docSemesterSiswa.reference.collection('nilai').doc(docIdNilaiHarian);
 
-      CollectionReference<Map<String, dynamic>> colNilaiHarian = docSemesterSiswa!.reference.collection('nilai');
-      DocumentReference<Map<String, dynamic>> docNilaiRef = colNilaiHarian.doc(docIdNilaiHarian);
-
-      // int nilaiNumerik = int.parse(nilaiC.text);
-      // String grade = _getGrade(nilaiNumerik);
-
+      // --- PENAMBAHAN: Memberikan nilai default untuk mencegah null ---
       final Map<String, dynamic> dataNilai = {
-        // "tanggalinput": Timestamp.fromDate(now), // Simpan sebagai Timestamp
-        "tanggalinput": DateTime.now().toIso8601String(), // Rubah jadi String
+        "tanggalinput": now.toIso8601String(),
         "emailpenginput": _currentUserEmail,
-        "fase": dataArgs['fase'],
+        "fase": dataArgs['fase'] ?? 'Data Kosong',
         "idpengampu": _currentUserId,
-        "idsiswa": dataArgs['nisn'],
-        "kelas": dataArgs['kelas'],
-        "kelompokmengaji": dataArgs['kelompokmengaji'],
-        "namapengampu": dataArgs['namapengampu'],
+        "idsiswa": nisnSiswa,
+        "kelas": dataArgs['kelas'] ?? 'Data Kosong',
+        "kelompokmengaji": dataArgs['kelompokmengaji'] ?? 'Data Kosong',
+        "namapengampu": dataArgs['namapengampu'] ?? 'Data Kosong',
         "namasemester": namaSemester,
-        "namasiswa": dataArgs['namasiswa'],
-        "tahunajaran": dataArgs['tahunajaran'],
-        // "tempatmengaji": dataArgs['tempatmengaji'],
-        "suratsabaq": suratsabaqC.text.trim(),
+        "namasiswa": dataArgs['namasiswa'] ?? 'Siswa Tidak Dikenali',
+        "tahunajaran": tahunAjaranRaw, // Disimpan dalam format asli
+        "suratsabaq": selectedSuratSabaq.value,
         "sabaq": sabaqC.text.trim(),
-        "nilaisabaq": nilaisabaqC.text.trim(),
-        "suratsabqi": suratsabqiC.text.trim(),
+        "nilaisabaq": selectedNilaiSabaq.value,
+        "suratsabqi": selectedSuratSabqi.value,
         "sabqi": sabqiC.text.trim(),
-        "nilaisabqi": nilaisabqiC.text.trim(),
-        "suratmanzil": suratmanzilC.text.trim(),
+        "nilaisabqi": selectedNilaiSabqi.value,
+        "suratmanzil": selectedSuratManzil.value,
         "manzil": manzilC.text.trim(),
-        "nilaimanzil": nilaimanzilC.text.trim(),
+        "nilaimanzil": selectedNilaiManzil.value,
         "tugastambahan": tugasTambahanC.text.trim(),
-        "nilaitugastambahan": nilaiTugasTambahanC.text.trim(),
+        "nilaitugastambahan": selectedNilaiTugas.value,
         "alhusna": alhusnaSaatIni,
         "keteranganpengampu": keteranganHalaqoh.value,
-        "keteranganorangtua": "0", // Default
-        "uidnilai": docIdNilaiHarian, // atau docNilaiRef.id
+        "keteranganorangtua": "0",
+        "uidnilai": docIdNilaiHarian,
         "last_updated": FieldValue.serverTimestamp(),
-        "lastupdatedsting": FieldValue.serverTimestamp().toString(),
       };
 
       DocumentSnapshot<Map<String, dynamic>> cekNilaiHariIni = await docNilaiRef.get();
@@ -268,87 +230,53 @@ class PemberianNilaiHalaqohController extends GetxController {
       if (cekNilaiHariIni.exists) {
         Get.defaultDialog(
           title: 'Konfirmasi Update',
-          titleStyle: const TextStyle(fontWeight: FontWeight.bold),
           middleText: 'Nilai untuk hari ini sudah ada. Apakah Anda ingin memperbarui data nilai?',
           textConfirm: 'Ya, Update',
           textCancel: 'Batal',
-          confirmTextColor: Colors.white,
-          buttonColor: Get.theme.colorScheme.primary,
           onConfirm: () async {
-            Get.back(); // Tutup dialog
+            Get.back();
             await docNilaiRef.update(dataNilai);
-            Get.snackbar('Sukses', 'Nilai berhasil diperbarui.',
-                backgroundColor: Colors.green, colorText: Colors.white);
-            _clearFields(); // Opsional: bersihkan field setelah update
-            // Get.back(); // Kembali ke halaman sebelumnya jika perlu
+            Get.snackbar('Sukses', 'Nilai berhasil diperbarui.', backgroundColor: Colors.green, colorText: Colors.white);
+            _clearFields();
           },
-          onCancel: () {}
         );
       } else {
         await docNilaiRef.set(dataNilai);
-        Get.snackbar('Sukses', 'Nilai berhasil disimpan.',
-            backgroundColor: Colors.green, colorText: Colors.white);
-        _clearFields(); // Bersihkan field setelah simpan baru
-        // Get.back(); // Kembali ke halaman sebelumnya jika perlu
+        Get.snackbar('Sukses', 'Nilai berhasil disimpan.', backgroundColor: Colors.green, colorText: Colors.white);
+        _clearFields();
       }
-      // Panggil method refresh() Anda jika ada dan dibutuhkan
     } catch (e) {
-      // print("Error simpanNilai: $e");
-      Get.snackbar('Error', 'Terjadi kesalahan saat menyimpan: ${e.toString()}',
-          backgroundColor: Colors.red.shade700, colorText: Colors.white);
+      // Menampilkan pesan error yang lebih spesifik dari validasi di atas
+      Get.snackbar('Error Kritis', 'Gagal menyimpan: ${e.toString()}', backgroundColor: Colors.red.shade700, colorText: Colors.white, duration: const Duration(seconds: 5));
     } finally {
       isLoading.value = false;
     }
   }
 
- 
-
   void _clearFields() {
-    suratsabaqC.clear();
     sabaqC.clear();
-    nilaisabaqC.clear();
-    suratsabqiC.clear();
     sabqiC.clear();
-    nilaisabqiC.clear();
-    suratmanzilC.clear();
     manzilC.clear();
-    nilaimanzilC.clear();
     tugasTambahanC.clear();
-    nilaiTugasTambahanC.clear();
+    selectedSuratSabaq.value = '';
+    selectedNilaiSabaq.value = '';
+    selectedSuratSabqi.value = '';
+    selectedNilaiSabqi.value = '';
+    selectedSuratManzil.value = '';
+    selectedNilaiManzil.value = '';
+    selectedNilaiTugas.value = '';
     keteranganHalaqoh.value = "";
-    // keteranganGuruC.clear();
   }
 
   @override
   void onClose() {
-    suratsabaqC.dispose();
     sabaqC.dispose();
-    nilaisabaqC.dispose();
-    suratsabqiC.dispose();
     sabqiC.dispose();
-    nilaisabqiC.dispose();
-    suratmanzilC.dispose();
     manzilC.dispose();
-    nilaimanzilC.dispose();
     tugasTambahanC.dispose();
-    nilaiTugasTambahanC.dispose();
-    // keteranganGuruC.dispose();
     super.onClose();
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-// =========== KODE LAMA ==================
 
 
 // import 'package:cloud_firestore/cloud_firestore.dart';
@@ -358,229 +286,274 @@ class PemberianNilaiHalaqohController extends GetxController {
 // import 'package:intl/intl.dart';
 
 // class PemberianNilaiHalaqohController extends GetxController {
-//   RxString keteranganHalaqoh = "".obs;
+//   // --- State Observables ---
+//   final RxString keteranganHalaqoh = "".obs;
+//   final RxBool isLoading = false.obs;
 
-//   TextEditingController suratC = TextEditingController();
-//   TextEditingController ayatHafalC = TextEditingController();
-//   TextEditingController jldSuratC = TextEditingController();
-//   TextEditingController halAyatC = TextEditingController();
-//   TextEditingController materiC = TextEditingController();
-//   TextEditingController nilaiC = TextEditingController();
-//   // TextEditingController keteranganGuruC = TextEditingController();
+//    // BARU: Gunakan RxString untuk menampung nilai terpilih dari DropdownSearch.
+//   // Ini lebih efisien daripada menggunakan TextEditingController untuk dropdown.
+//   final RxString selectedSuratSabaq = ''.obs;
+//   final RxString selectedNilaiSabaq = ''.obs;
+//   final RxString selectedSuratSabqi = ''.obs;
+//   final RxString selectedNilaiSabqi = ''.obs;
+//   final RxString selectedSuratManzil = ''.obs;
+//   final RxString selectedNilaiManzil = ''.obs;
+//   final RxString selectedNilaiTugas = ''.obs;
 
-//   var data = Get.arguments;
+//   // --- Text Editing Controllers (hanya untuk TextField biasa) ---
+//   late TextEditingController sabaqC;
+//   late TextEditingController sabqiC;
+//   late TextEditingController manzilC;
+//   late TextEditingController tugasTambahanC;
 
-//   FirebaseAuth auth = FirebaseAuth.instance;
-//   FirebaseFirestore firestore = FirebaseFirestore.instance;
+//   // late final Map<String, dynamic> dataArgs;
 
-//   String idUser = FirebaseAuth.instance.currentUser!.uid;
-//   String idSekolah = '20404148';
-//   String emailAdmin = FirebaseAuth.instance.currentUser!.email!;
+//   // --- Firebase Instances ---
+//   final FirebaseAuth _auth = FirebaseAuth.instance;
+//   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-//   onChangeAlias(String catatan) {
-//     keteranganHalaqoh.value = catatan;
+//   // --- Data from Arguments ---
+//   // Akan diinisialisasi di onInit dari Get.arguments
+//   Map<String, dynamic> dataArgs = {};
+
+//   // --- Constants (bisa dipindah ke file konfigurasi) ---
+//   static const String _defaultIdSekolah = 'P9984539';
+
+//   // --- Getters ---
+//   String get _currentUserId => _auth.currentUser!.uid;
+//   String get _currentUserEmail => _auth.currentUser!.email!;
+//   String get _idSekolah => dataArgs['id_sekolah'] ?? _defaultIdSekolah; // Contoh jika id_sekolah bisa dari args
+
+//     @override
+//   void onInit() {
+//     super.onInit();
+//     final arguments = Get.arguments;
+//     if (arguments is Map<String, dynamic>) {
+//       dataArgs = arguments;
+//     } else {
+//       dataArgs = {};
+//       Get.snackbar("Error", "Data navigasi tidak valid.", backgroundColor: Colors.red);
+//     }
+    
+//     // Inisialisasi controller untuk TextField
+//     sabaqC = TextEditingController();
+//     sabqiC = TextEditingController();
+//     manzilC = TextEditingController();
+//     tugasTambahanC = TextEditingController();
 //   }
 
-//   Future<String> ambilDataUmi() async {
-//     String idTahunAjaranNya = data['tahunajaran'];
-//     String idTahunAjaran = idTahunAjaranNya.replaceAll("/", "-");
-
-//     CollectionReference<Map<String, dynamic>> colSemester = firestore
-//         .collection('Sekolah')
-//         .doc(idSekolah)
-//         .collection('tahunajaran')
-//         .doc(idTahunAjaran)
-//         // .collection('semester')
-//         // .doc(data['namasemester'])
-//         .collection('kelompokmengaji')
-//         .doc(data['fase'])
-//         .collection('pengampu')
-//         .doc(data['namapengampu'])
-//         .collection('tempat')
-//         .doc(data['tempatmengaji'])
-//         .collection('daftarsiswa')
-//         .doc(data['nisn'])
-//         .collection('semester');
-
-//     QuerySnapshot<Map<String, dynamic>> snapSemester = await colSemester.get();
-//     if (snapSemester.docs.isNotEmpty) {
-//       Map<String, dynamic> dataSemester = snapSemester.docs.first.data();
-//       String umi = dataSemester['ummi'];
-
-//       return umi;
+//   void onChangeKeterangan(String? catatan) {
+//     if (catatan != null) {
+//       keteranganHalaqoh.value = catatan;
 //     }
-//     throw Exception('UMI data not found');
+//   }
+
+//   Future<String?> ambilDataAlHusna() async {
+//     if (dataArgs.isEmpty || dataArgs['tahunajaran'] == null) {
+//       // print("Error: Data arguments tidak lengkap untuk ambilDataUmi");
+//       return "Data siswa tidak lengkap";
+//     }
+
+//     String idTahunAjaranRaw = dataArgs['tahunajaran'];
+//     String idTahunAjaran = idTahunAjaranRaw.replaceAll("/", "-");
+
+//     try {
+//       // Path disesuaikan dengan asumsi 'namaSemester' adalah ID unik per siswa di bawah collection 'semester'
+//       // atau kita perlu mengambil dokumen semester yang relevan.
+//       // Kode asli mengambil `snapSemester.docs.first.data()`, mengasumsikan ada satu dokumen.
+//       QuerySnapshot<Map<String, dynamic>> snapSemesterSiswa = await _firestore
+//           .collection('Sekolah').doc(_idSekolah)
+//           .collection('tahunajaran').doc(idTahunAjaran)
+//           .collection('kelompokmengaji').doc(dataArgs['fase'])
+//           .collection('pengampu').doc(dataArgs['namapengampu'])
+//           // .collection('tempat').doc(dataArgs['tempatmengaji'])
+//           .collection('daftarsiswa').doc(dataArgs['nisn'])
+//           .collection('semester')
+//           .limit(1) // Ambil dokumen semester terakhir/aktif
+//           .get();
+
+//       if (snapSemesterSiswa.docs.isNotEmpty) {
+//         Map<String, dynamic> dataSemester = snapSemesterSiswa.docs.first.data();
+//         return dataSemester['alhusna'] as String? ?? "Belum diinput";
+//       }
+//       return "Belum diinput"; // Jika tidak ada dokumen semester
+//     } catch (e) {
+//       // print("Error ambilDataUmi: $e");
+//       return "Gagal memuat data";
+//     }
+//   }
+
+//   String? _validateInput() {
+//     // UBAH: Validasi menggunakan nilai dari RxString
+//     if (sabaqC.text.trim().isEmpty) return 'Sabaq masih kosong';
+//     if (selectedNilaiSabaq.value.isEmpty) return 'Nilai sabaq masih kosong';
+//     if (sabqiC.text.trim().isEmpty) return 'Sabqi masih kosong';
+//     if (selectedNilaiSabqi.value.isEmpty) return 'Nilai sabqi masih kosong';
+//     if (manzilC.text.trim().isEmpty) return 'Manzil masih kosong';
+//     if (selectedNilaiManzil.value.isEmpty) return 'Nilai manzil masih kosong';
+//     if (tugasTambahanC.text.trim().isEmpty) return 'Tugas tambahan masih kosong';
+//     if (selectedNilaiTugas.value.isEmpty) return 'Nilai tugas tambahan masih kosong';
+//     if (keteranganHalaqoh.value.isEmpty) return 'Keterangan pengampu masih kosong';
+//     return null;
 //   }
 
 //   Future<void> simpanNilai() async {
-//     // print("data = $data");
-//     if (data != null && data.isNotEmpty) {
-//       String idTahunAjaranNya = data['tahunajaran'];
-//       String idTahunAjaran = idTahunAjaranNya.replaceAll("/", "-");
+    
+//     final validationError = _validateInput();
+//     if (validationError != null) {
+//       Get.snackbar('Peringatan', validationError,
+//           backgroundColor: Colors.orange.shade700, colorText: Colors.white, snackPosition: SnackPosition.BOTTOM);
+//       return;
+//     }
 
-//       CollectionReference<Map<String, dynamic>> colSemester = firestore
-//           .collection('Sekolah')
-//           .doc(idSekolah)
-//           .collection('tahunajaran')
-//           .doc(idTahunAjaran)
-//           // .collection('semester')
-//           // .doc(data['namasemester'])
-//           .collection('kelompokmengaji')
-//           .doc(data['fase'])
-//           .collection('pengampu')
-//           .doc(data['namapengampu'])
-//           .collection('tempat')
-//           .doc(data['tempatmengaji'])
-//           .collection('daftarsiswa')
-//           .doc(data['nisn'])
-//           .collection('semester');
+//     isLoading.value = true;
 
-//       QuerySnapshot<Map<String, dynamic>> snapSemester =
-//           await colSemester.get();
-//       if (snapSemester.docs.isNotEmpty) {
-//         Map<String, dynamic> dataSemester = snapSemester.docs.first.data();
-//         String namaSemester = dataSemester['namasemester'];
-//         String umi = dataSemester['ummi'];
+//     if (dataArgs.isEmpty) {
+//       Get.snackbar('Error', 'Data siswa tidak lengkap untuk penyimpanan.',
+//           backgroundColor: Colors.red.shade700, colorText: Colors.white);
+//       isLoading.value = false;
+//       return;
+//     }
 
-//         CollectionReference<Map<String, dynamic>> colNilai = firestore
-//             .collection('Sekolah')
-//             .doc(idSekolah)
-//             .collection('tahunajaran')
-//             .doc(idTahunAjaran)
-//             .collection('kelompokmengaji')
-//             .doc(data['fase'])
-//             .collection('pengampu')
-//             .doc(data['namapengampu'])
-//             .collection('tempat')
-//             .doc(data['tempatmengaji'])
-//             .collection('daftarsiswa')
-//             .doc(data['nisn'])
-//             .collection('semester')
-//             .doc(namaSemester)
-//             .collection('nilai');
+//     try {
+//       String idTahunAjaranRaw = dataArgs['tahunajaran'];
+//       String idTahunAjaran = idTahunAjaranRaw.replaceAll("/", "-");
+//       DateTime now = DateTime.now();
+//       String docIdNilaiHarian = DateFormat('dd-MM-yyyy').format(now); // ID untuk nilai harian
 
-//         QuerySnapshot<Map<String, dynamic>> snapNilai = await colNilai.get();
+//       // Ambil data semester siswa (termasuk namaSemester dan UMI terakhir)
+//       DocumentSnapshot<Map<String, dynamic>>? docSemesterSiswa;
+//       QuerySnapshot<Map<String, dynamic>> snapSemesterSiswa = await _firestore
+//           .collection('Sekolah').doc(_idSekolah)
+//           .collection('tahunajaran').doc(idTahunAjaran)
+//           .collection('kelompokmengaji').doc(dataArgs['fase'])
+//           .collection('pengampu').doc(dataArgs['namapengampu'])
+//           // .collection('tempat').doc(dataArgs['tempatmengaji'])
+//           .collection('daftarsiswa').doc(dataArgs['nisn'])
+//           .collection('semester')
+//           .orderBy('tanggalinput', descending: true) // Asumsi ada field timestamp
+//           .limit(1)
+//           .get();
 
-//         DateTime now = DateTime.now();
-//         String docIdNilai = DateFormat.yMd().format(now).replaceAll('/', '-');
+//       String namaSemester;
+//       String alhusnaSaatIni;
 
-//         //konversi nilai string ke integer
-//         int nilaiNumerik = int.parse(nilaiC.text);
-
-//         //mendapatkan grade huruf
-//         String grade = getGrade(nilaiNumerik);
-
-//         // ignore: prefer_is_empty
-//         if (snapNilai.docs.length == 0 || snapNilai.docs.isEmpty) {
-//           //belum pernah input nilai & set nilai
-//           colNilai.doc(docIdNilai).set({
-//             "tanggalinput": now.toIso8601String(),
-//             "emailpenginput": emailAdmin,
-//             "fase": data['fase'],
-//             "idpengampu": idUser,
-//             "idsiswa": data['nisn'],
-//             "kelas": data['kelas'],
-//             "kelompokmengaji": data['kelompokmengaji'],
-//             "namapengampu": data['namapengampu'],
-//             "namasemester": namaSemester,
-//             "namasiswa": data['namasiswa'],
-//             "tahunajaran": data['tahunajaran'],
-//             "tempatmengaji": data['tempatmengaji'],
-//             "hafalansurat": suratC.text,
-//             "ayathafalansurat": ayatHafalC.text,
-//             "ummijilidatausurat": umi,
-//             "ummihalatauayat": halAyatC.text,
-//             "materi": materiC.text,
-//             "nilai": nilaiC.text,
-//             "nilaihuruf": grade,
-//             "keteranganpengampu": keteranganHalaqoh.value,
-//             "keteranganorangtua": "0",
-//             "uidnilai": docIdNilai,
-//           });
-
-//           // Get.back();
-//           Get.snackbar(
-//             'Informasi',
-//             'Berhasil input nilai',
-//             snackPosition: SnackPosition.BOTTOM,
-//             backgroundColor: Colors.grey[350],
-//           );
-//           refresh();
-//         } else {
-//           DocumentSnapshot<Map<String, dynamic>> docNilaiToday =
-//               await colNilai.doc(docIdNilai).get();
-
-//           if (docNilaiToday.exists == true) {
-//             // Get.snackbar('Informasi', 'hari ini ananda sudah input nilai',
-//             //     snackPosition: SnackPosition.BOTTOM,
-//             //     backgroundColor: Colors.grey[350]);
-//             Get.defaultDialog(
-//               title: 'Informasi',
-//               content: Text(
-//                 'Hari ini ananda sudah input nilai, Apakah Ananda mau update nilai??',
-//                 style: TextStyle(fontSize: 16),
-//               ),
-//               textConfirm: 'OK',
-//               onConfirm: () {
-//                 refresh();
-//                 Get.snackbar("isi logika", "nilainya harus diupdate");
-//               },
-//             );
-//           } else {
-//             colNilai.doc(docIdNilai).set({
-//               "tanggalinput": now.toIso8601String(),
-//               "emailpenginput": emailAdmin,
-//               "fase": data['fase'],
-//               "idpengampu": idUser,
-//               "idsiswa": data['nisn'],
-//               "kelas": data['kelas'],
-//               "kelompokmengaji": data['kelompokmengaji'],
-//               "namapengampu": data['namapengampu'],
-//               "namasemester": namaSemester,
-//               "namasiswa": data['namasiswa'],
-//               "tahunajaran": data['tahunajaran'],
-//               "tempatmengaji": data['tempatmengaji'],
-//               "hafalansurat": suratC.text,
-//               "ayathafalansurat": ayatHafalC.text,
-//               "ummijilidatausurat": umi,
-//               "ummihalatauayat": halAyatC.text,
-//               "materi": materiC.text,
-//               "nilai": nilaiC.text,
-//               "nilaihuruf": grade,
-//               "keteranganpengampu": keteranganHalaqoh.value,
-//               "keteranganorangtua": "0",
-//               "uidnilai": docIdNilai,
-//             });
-
-//             Get.back();
-
-//             Get.snackbar(
-//               'Informasi',
-//               'Berhasil input nilai',
-//               snackPosition: SnackPosition.BOTTOM,
-//               backgroundColor: Colors.grey[350],
-//             );
-
-//             refresh();
-//           }
-//         }
+//       if (snapSemesterSiswa.docs.isNotEmpty) {
+//           docSemesterSiswa = snapSemesterSiswa.docs.first;
+//           namaSemester = docSemesterSiswa.data()?['namasemester'] ?? "Semester Tidak Diketahui";
+//           alhusnaSaatIni = docSemesterSiswa.data()?['alhusna'] ?? "al-husna Tidak Diketahui";
+//       } else {
+//           // Handle jika tidak ada data semester, mungkin perlu dibuat dulu atau error
+//           Get.snackbar('Error', 'Data semester siswa tidak ditemukan.',
+//               backgroundColor: Colors.red.shade700, colorText: Colors.white);
+//           isLoading.value = false;
+//           return;
 //       }
+
+//       CollectionReference<Map<String, dynamic>> colNilaiHarian = docSemesterSiswa!.reference.collection('nilai');
+//       DocumentReference<Map<String, dynamic>> docNilaiRef = colNilaiHarian.doc(docIdNilaiHarian);
+
+//       // int nilaiNumerik = int.parse(nilaiC.text);
+//       // String grade = _getGrade(nilaiNumerik);
+
+//       final Map<String, dynamic> dataNilai = {
+//         // "tanggalinput": Timestamp.fromDate(now), // Simpan sebagai Timestamp
+//         "tanggalinput": DateTime.now().toIso8601String(), // Rubah jadi String
+//         "emailpenginput": _currentUserEmail,
+//         "fase": dataArgs['fase'],
+//         "idpengampu": _currentUserId,
+//         "idsiswa": dataArgs['nisn'],
+//         "kelas": dataArgs['kelas'],
+//         "kelompokmengaji": dataArgs['kelompokmengaji'],
+//         "namapengampu": dataArgs['namapengampu'],
+//         "namasemester": namaSemester,
+//         "namasiswa": dataArgs['namasiswa'],
+//         "tahunajaran": dataArgs['tahunajaran'],
+//         // "tempatmengaji": dataArgs['tempatmengaji'],
+//         "suratsabaq": selectedSuratSabaq.value,
+//         "sabaq": sabaqC.text.trim(),
+//         "nilaisabaq": selectedNilaiSabaq.value,
+//         "suratsabqi": selectedSuratSabqi.value,
+//         "sabqi": sabqiC.text.trim(),
+//         "nilaisabqi": selectedNilaiSabqi.value,
+//         "suratmanzil": selectedSuratManzil.value,
+//         "manzil": manzilC.text.trim(),
+//         "nilaimanzil": selectedNilaiManzil.value,
+//         "tugastambahan": tugasTambahanC.text.trim(),
+//         "nilaitugastambahan": selectedNilaiTugas.value,
+//         "alhusna": alhusnaSaatIni,
+//         "keteranganpengampu": keteranganHalaqoh.value,
+//         "keteranganorangtua": "0", // Default
+//         "uidnilai": docIdNilaiHarian, // atau docNilaiRef.id
+//         "last_updated": FieldValue.serverTimestamp(),
+//         "lastupdatedsting": FieldValue.serverTimestamp().toString(),
+//       };
+
+//       DocumentSnapshot<Map<String, dynamic>> cekNilaiHariIni = await docNilaiRef.get();
+
+//       if (cekNilaiHariIni.exists) {
+//         Get.defaultDialog(
+//           title: 'Konfirmasi Update',
+//           titleStyle: const TextStyle(fontWeight: FontWeight.bold),
+//           middleText: 'Nilai untuk hari ini sudah ada. Apakah Anda ingin memperbarui data nilai?',
+//           textConfirm: 'Ya, Update',
+//           textCancel: 'Batal',
+//           confirmTextColor: Colors.white,
+//           buttonColor: Get.theme.colorScheme.primary,
+//           onConfirm: () async {
+//             Get.back(); // Tutup dialog
+//             await docNilaiRef.update(dataNilai);
+//             Get.snackbar('Sukses', 'Nilai berhasil diperbarui.',
+//                 backgroundColor: Colors.green, colorText: Colors.white);
+//             _clearFields(); // Opsional: bersihkan field setelah update
+//             // Get.back(); // Kembali ke halaman sebelumnya jika perlu
+//           },
+//           onCancel: () {}
+//         );
+//       } else {
+//         await docNilaiRef.set(dataNilai);
+//         Get.snackbar('Sukses', 'Nilai berhasil disimpan.',
+//             backgroundColor: Colors.green, colorText: Colors.white);
+//         _clearFields(); // Bersihkan field setelah simpan baru
+//         // Get.back(); // Kembali ke halaman sebelumnya jika perlu
+//       }
+//       // Panggil method refresh() Anda jika ada dan dibutuhkan
+//     } catch (e) {
+//       print("Error simpanNilai: $e");
+//       Get.snackbar('Error', 'Terjadi kesalahan saat menyimpan: ${e.toString()}',
+//           backgroundColor: Colors.red.shade700, colorText: Colors.white);
+//     } finally {
+//       isLoading.value = false;
 //     }
 //   }
 
-//   String getGrade(int score) {
-//     if (score >= 90 && score <= 100) {
-//       return 'A';
-//     } else if (score >= 70 && score <= 80) {
-//       return 'B';
-//     } else if (score >= 50 && score <= 60) {
-//       return 'C';
-//     } else if (score >= 30 && score <= 40) {
-//       return 'D';
-//     } else if (score >= 0 && score <= 20) {
-//       return 'E';
-//     } else {
-//       return 'Nilai tidak valid';
-//     }
+ 
+
+//    void _clearFields() {
+//     // Bersihkan semua state
+//     sabaqC.clear();
+//     sabqiC.clear();
+//     manzilC.clear();
+//     tugasTambahanC.clear();
+    
+//     selectedSuratSabaq.value = '';
+//     selectedNilaiSabaq.value = '';
+//     selectedSuratSabqi.value = '';
+//     selectedNilaiSabqi.value = '';
+//     selectedSuratManzil.value = '';
+//     selectedNilaiManzil.value = '';
+//     selectedNilaiTugas.value = '';
+    
+//     keteranganHalaqoh.value = "";
+//   }
+
+//    @override
+//   void onClose() {
+//     // Dispose semua controller yang dibuat
+//     sabaqC.dispose();
+//     sabqiC.dispose();
+//     manzilC.dispose();
+//     tugasTambahanC.dispose();
+//     super.onClose();
 //   }
 // }

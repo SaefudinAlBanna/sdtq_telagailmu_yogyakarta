@@ -81,8 +81,7 @@ class TambahSiswaController extends GetxController {
             "pekerjaanWali": "",
             "pendidikanWali": "",
             "status": "baru",
-            // "biayaSpp": biayaSppController.text,
-            // "biayaUangPangkal": biayaUangPangkalController.text,
+            
           });
 
           await siswaCredential.user!.sendEmailVerification();

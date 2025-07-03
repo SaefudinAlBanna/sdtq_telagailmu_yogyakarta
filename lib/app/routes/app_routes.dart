@@ -37,6 +37,18 @@ abstract class Routes {
   static const DAFTAR_SISWA_PINDAH_HALAQOH = _Paths.DAFTAR_SISWA_PINDAH_HALAQOH;
   static const DETAIL_NILAI_HALAQOH = _Paths.DETAIL_NILAI_HALAQOH;
   static const INPUT_CATATAN_KHUSUS_SISWA = _Paths.INPUT_CATATAN_KHUSUS_SISWA;
+  static const REKAPITULASI_PEMBAYARAN = _Paths.REKAPITULASI_PEMBAYARAN;
+  static const REKAPITULASI_PEMBAYARAN_RINCI =
+      _Paths.REKAPITULASI_PEMBAYARAN_RINCI;
+  static const INPUT_EKSKUL = _Paths.INPUT_EKSKUL;
+  static const DAFTAR_EKSKUL = _Paths.DAFTAR_EKSKUL;
+  static const CATATAN_SISWA = _Paths.CATATAN_SISWA;
+  static const TANGGAPAN_CATATAN = _Paths.TANGGAPAN_CATATAN;
+  static const KALENDER_AKADEMIK = _Paths.KALENDER_AKADEMIK;
+  static const INFO_SEKOLAH_DETAIL = _Paths.INFO_SEKOLAH_DETAIL;
+  static const IMPORT_SISWA_EXCEL = _Paths.IMPORT_SISWA_EXCEL;
+  static const INPUT_NILAI_SISWA = _Paths.INPUT_NILAI_SISWA;
+  static const RAPOR_SISWA = _Paths.RAPOR_SISWA;
 }
 
 abstract class _Paths {
@@ -75,4 +87,15 @@ abstract class _Paths {
   static const DAFTAR_SISWA_PINDAH_HALAQOH = '/daftar-siswa-pindah-halaqoh';
   static const DETAIL_NILAI_HALAQOH = '/detail-nilai-halaqoh';
   static const INPUT_CATATAN_KHUSUS_SISWA = '/input-catatan-khusus-siswa';
+  static const REKAPITULASI_PEMBAYARAN = '/rekapitulasi-pembayaran';
+  static const REKAPITULASI_PEMBAYARAN_RINCI = '/rekapitulasi-pembayaran-rinci';
+  static const INPUT_EKSKUL = '/input-ekskul';
+  static const DAFTAR_EKSKUL = '/daftar-ekskul';
+  static const CATATAN_SISWA = '/catatan-siswa';
+  static const TANGGAPAN_CATATAN = '/tanggapan-catatan';
+  static const KALENDER_AKADEMIK = '/kalender-akademik';
+  static const INFO_SEKOLAH_DETAIL = '/info-sekolah-detail';
+  static const IMPORT_SISWA_EXCEL = '/import-siswa-excel';
+  static const INPUT_NILAI_SISWA = '/input-nilai-siswa';
+  static const RAPOR_SISWA = '/rapor-siswa';
 }

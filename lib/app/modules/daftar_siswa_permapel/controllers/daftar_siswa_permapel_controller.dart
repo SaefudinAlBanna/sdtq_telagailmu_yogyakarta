@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 // import 'package:flutter/material.dart';
 
 class DaftarSiswaPermapelController extends GetxController {
-  var dataArgumen = Get.arguments;
+  final Map<String, dynamic> dataArgumen = Get.arguments; 
 
   FirebaseAuth auth = FirebaseAuth.instance;
   FirebaseFirestore firestore = FirebaseFirestore.instance;
@@ -84,6 +84,7 @@ class DaftarSiswaPermapelController extends GetxController {
  Future<QuerySnapshot<Map<String, dynamic>>> getDataSiswa() async {
     String tahunajaranya = await getTahunAjaranTerakhir();
     String idTahunAjaran = tahunajaranya.replaceAll("/", "-");
+    String idKelas = dataArgumen['idKelas'];
        
           return await firestore
               .collection('Sekolah')
@@ -91,7 +92,7 @@ class DaftarSiswaPermapelController extends GetxController {
               .collection('tahunajaran')
               .doc(idTahunAjaran)
               .collection('kelastahunajaran')
-              .doc(dataArgumen)
+              .doc(idKelas)
               .collection('daftarsiswa')
               .get();
     

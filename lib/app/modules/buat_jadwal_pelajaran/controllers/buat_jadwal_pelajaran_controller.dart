@@ -15,9 +15,13 @@ class BuatJadwalPelajaranController extends GetxController {
   RxString selectedHari = 'Senin'.obs;
 
   // Daftar hari
-  List<String> daftarHari = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  List<String> daftarHari = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
 
   RxBool isLoading = false.obs;
+
+  // --- STATE BARU UNTUK KELAS ---
+  final RxList<Map<String, dynamic>> daftarKelas = <Map<String, dynamic>>[].obs;
+  final RxString selectedKelasId = ''.obs;
 
   // ID Sekolah dan Tahun Ajaran (bisa didapatkan dari parameter atau inputan lain)
   // Untuk contoh ini kita hardcode dulu, idealnya ini dinamis
@@ -33,8 +37,40 @@ class BuatJadwalPelajaranController extends GetxController {
     }
     // Anda bisa tambahkan logic untuk load data jika sudah ada
     // loadJadwalFromFirestore();
+    _fetchDaftarKelas();
   }
 
+  /// FUNGSI BARU: Mengambil daftar kelas untuk dropdown
+  Future<void> _fetchDaftarKelas() async {
+    isLoading.value = true;
+    try {
+      final snapshot = await firestore
+          .collection('Sekolah')
+          .doc(idSekolah)
+          .collection('kelas')
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        daftarKelas.value = snapshot.docs.map((doc) => {
+          'id': doc.id,
+          'nama': doc.data()['namakelas'] ?? 'Tanpa Nama', // Sesuaikan field 'namakelas'
+        }).toList();
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'Gagal mengambil daftar kelas: ${e.toString()}');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /// FUNGSI BARU: Dipanggil saat dropdown kelas berubah
+  Future<void> onKelasChanged(String? kelasId) async {
+    if (kelasId == null || kelasId.isEmpty) return;
+    selectedKelasId.value = kelasId;
+    // Otomatis muat jadwal untuk kelas yang baru dipilih
+    await loadJadwalFromFirestore();
+  }
+  
   void changeSelectedHari(String? hari) {
     if (hari != null) {
       selectedHari.value = hari;
@@ -60,7 +96,8 @@ class BuatJadwalPelajaranController extends GetxController {
     final listPelajaranHariIni = jadwalPelajaran[selectedHari.value];
     if (listPelajaranHariIni != null) {
       listPelajaranHariIni.add({
-        'jamKe': listPelajaranHariIni.length + 1,
+        // 'jamKe': listPelajaranHariIni.length + 1,
+          'jamKe': jadwalPelajaran[selectedHari.value]!.length + 1,
         'mapel': '',
         'mulai': '00:00', // Default
         'selesai': '00:00', // Default
@@ -69,7 +106,7 @@ class BuatJadwalPelajaranController extends GetxController {
   }
 
   // Menghapus pelajaran dari hari yang dipilih berdasarkan index
-  void hapusPelajaran(int index) {
+  void hapusPelajaran(int index) async {
     final listPelajaranHariIni = jadwalPelajaran[selectedHari.value];
     if (listPelajaranHariIni != null && index < listPelajaranHariIni.length) {
       listPelajaranHariIni.removeAt(index);
@@ -77,6 +114,8 @@ class BuatJadwalPelajaranController extends GetxController {
       for (int i = 0; i < listPelajaranHariIni.length; i++) {
         listPelajaranHariIni[i]['jamKe'] = i + 1;
       }
+      listPelajaranHariIni.refresh();
+      await simpanJadwalKeFirestore();
     }
   }
 
@@ -102,74 +141,86 @@ class BuatJadwalPelajaranController extends GetxController {
     }
   }
 
-  // Menyimpan seluruh jadwal ke Firestore
+  /// DIUBAH: Fungsi simpan sekarang memerlukan ID Kelas
   Future<void> simpanJadwalKeFirestore() async {
+    if (selectedKelasId.value.isEmpty) {
+      Get.snackbar('Perhatian', 'Silakan pilih kelas terlebih dahulu.');
+      return;
+    }
+
     String tahunajaranya = await getTahunAjaranTerakhir();
     String idTahunAjaran = tahunajaranya.replaceAll("/", "-");
     isLoading.value = true;
+
     try {
-      // Konversi RxMap dan RxList menjadi Map dan List biasa
       Map<String, List<Map<String, dynamic>>> dataToSave = {};
       jadwalPelajaran.forEach((hari, listPelajaran) {
-        // Pastikan hanya menyimpan hari yang ada pelajarannya atau sesuai kebutuhan
-        // if (listPelajaran.isNotEmpty) {
-          dataToSave[hari] = listPelajaran.map((p) => Map<String, dynamic>.from(p)).toList();
-        // }
+        dataToSave[hari] = listPelajaran.map((p) => Map<String, dynamic>.from(p)).toList();
       });
 
-      // Path ke dokumen di Firestore
+      // --- PATH BARU YANG DINAMIS BERDASARKAN KELAS ---
       DocumentReference docRef = firestore
           .collection('Sekolah')
           .doc(idSekolah)
           .collection('tahunajaran')
           .doc(idTahunAjaran)
-          .collection('jadwalpelajaran')
-          .doc(idTahunAjaran);
+          .collection('kelastahunajaran')
+          .doc(selectedKelasId.value); // <-- Menggunakan ID kelas yang dipilih
 
-      await docRef.set(dataToSave); // Menggunakan set untuk overwrite atau create
+      // Menyimpan data jadwal ke dalam field 'jadwal' di dokumen kelas tersebut
+      await docRef.set({'jadwal': dataToSave}, SetOptions(merge: true));
 
-      Get.snackbar('Sukses', 'Jadwal pelajaran berhasil disimpan!',
-          snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar('Sukses', 'Jadwal pelajaran berhasil disimpan!', snackPosition: SnackPosition.BOTTOM);
     } catch (e) {
-      Get.snackbar('Error', 'Gagal menyimpan jadwal: ${e.toString()}',
-          snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar('Error', 'Gagal menyimpan jadwal: ${e.toString()}', snackPosition: SnackPosition.BOTTOM);
     } finally {
       isLoading.value = false;
     }
   }
 
-  // (Opsional) Fungsi untuk memuat jadwal dari Firestore
+  /// DIUBAH: Fungsi load sekarang memerlukan ID Kelas
   Future<void> loadJadwalFromFirestore() async {
+    if (selectedKelasId.value.isEmpty) {
+      // Jika tidak ada kelas dipilih, kosongkan jadwal
+      clearJadwal();
+      return;
+    }
+
     String tahunajaranya = await getTahunAjaranTerakhir();
     String idTahunAjaran = tahunajaranya.replaceAll("/", "-");
     isLoading.value = true;
+
     try {
+      // --- PATH BARU YANG DINAMIS BERDASARKAN KELAS ---
       DocumentSnapshot docSnap = await firestore
           .collection('Sekolah')
           .doc(idSekolah)
           .collection('tahunajaran')
           .doc(idTahunAjaran)
-          .collection('jadwalpelajaran')
-          .doc(idTahunAjaran)
+          .collection('kelastahunajaran')
+          .doc(selectedKelasId.value)
           .get();
 
+      clearJadwal(); // Selalu kosongkan jadwal sebelum memuat yang baru
+
       if (docSnap.exists && docSnap.data() != null) {
-        Map<String, dynamic> data = docSnap.data() as Map<String, dynamic>;
-        data.forEach((hari, listPelajaranData) {
-          if (jadwalPelajaran.containsKey(hari) && listPelajaranData is List) {
-            // Konversi List<dynamic> (dari firestore) menjadi List<Map<String, dynamic>>
-            jadwalPelajaran[hari]!.value = List<Map<String, dynamic>>.from(
-              listPelajaranData.map((item) => Map<String, dynamic>.from(item as Map))
-            );
-          }
-        });
-        // Jika ada hari yang dipilih, refresh untuk memastikan UI update
-        if (jadwalPelajaran.containsKey(selectedHari.value)) {
-          jadwalPelajaran[selectedHari.value]!.refresh();
+        final docData = docSnap.data() as Map<String, dynamic>;
+        // Ambil data dari field 'jadwal'
+        if (docData.containsKey('jadwal')) {
+          Map<String, dynamic> dataJadwal = docData['jadwal'];
+          dataJadwal.forEach((hari, listPelajaranData) {
+            if (jadwalPelajaran.containsKey(hari) && listPelajaranData is List) {
+              jadwalPelajaran[hari]!.value = List<Map<String, dynamic>>.from(
+                listPelajaranData.map((item) => Map<String, dynamic>.from(item as Map))
+              );
+            }
+          });
+          Get.snackbar('Info', 'Jadwal berhasil dimuat.', snackPosition: SnackPosition.BOTTOM);
+        } else {
+           Get.snackbar('Info', 'Belum ada jadwal tersimpan untuk kelas ini.', snackPosition: SnackPosition.BOTTOM);
         }
-        Get.snackbar('Info', 'Jadwal berhasil dimuat.', snackPosition: SnackPosition.BOTTOM);
       } else {
-        Get.snackbar('Info', 'Belum ada jadwal tersimpan untuk tahun ajaran ini.', snackPosition: SnackPosition.BOTTOM);
+        Get.snackbar('Info', 'Belum ada jadwal tersimpan untuk kelas ini.', snackPosition: SnackPosition.BOTTOM);
       }
     } catch (e) {
       Get.snackbar('Error', 'Gagal memuat jadwal: ${e.toString()}', snackPosition: SnackPosition.BOTTOM);
@@ -177,4 +228,12 @@ class BuatJadwalPelajaranController extends GetxController {
       isLoading.value = false;
     }
   }
+
+  void clearJadwal() {
+    for (var hari in daftarHari) {
+      jadwalPelajaran[hari]?.clear();
+    }
+  }
+  
+  
 }

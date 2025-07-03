@@ -29,10 +29,13 @@ class DaftarKelasView extends GetView<DaftarKelasController> {
                   return ListTile(
                     onTap: () {
                       String kelas = snapshot.data!.docs[index].data()['idKelas'];
+                      String mapel = snapshot.data!.docs[index].data()['namaMapel'];
                             // Get.toNamed(Routes.DETAIL_SISWA,
                             //     arguments: kelas);
                             Get.toNamed(Routes.DAFTAR_SISWA_PERMAPEL,
-                                arguments: kelas);
+                                                            // arguments: [kelas, mapel]);
+                                                            arguments: {'idKelas' : kelas,
+                                                            'namaMapel' : mapel});
                     },
                     title: Text(snapshot.data!.docs[index].data()['namaMapel']),
                     subtitle: Text(snapshot.data!.docs[index].data()['idKelas']),

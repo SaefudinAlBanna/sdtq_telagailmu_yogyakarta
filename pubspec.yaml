@@ -2,7 +2,7 @@ name: sdtq_telagailmu_yogyakarta
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
@@ -28,19 +28,33 @@ environment:
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
 dependencies:
+  cached_network_image: ^3.4.1
   carousel_slider: ^5.0.0
   cloud_firestore: ^5.6.7
   convex_bottom_bar: ^3.2.0
   cupertino_icons: ^1.0.8
+  dotted_border: ^3.0.1
   dropdown_search: ^6.0.2
+  excel: ^4.0.2
+  file_picker: ^10.2.0
   firebase_auth: ^5.5.3
-  firebase_core: ^3.13.0
+  firebase_core: ^3.13.1
   flutter:
     sdk: flutter
+  flutter_dotenv: ^5.2.1
   get: ^4.7.2
-  intl: ^0.19.0
-  lottie: ^3.3.1
+  get_storage: ^2.1.1
+  image_cropper: ^9.1.0
+  image_picker: ^1.1.2
+  intl: ^0.20.2
+  lottie: ^3.3.0
+  pdf: ^3.10.4
+  percent_indicator: ^4.2.3
   persistent_bottom_nav_bar: ^6.2.1
+  printing: ^5.11.0
+  supabase_flutter: ^2.9.0
+  table_calendar: ^3.2.0
+  timeago: ^3.6.1
 
 dev_dependencies:
   flutter_lints: ^5.0.0
@@ -51,7 +65,6 @@ dev_dependencies:
 # following page: https://dart.dev/tools/pub/pubspec
 # The following section is specific to Flutter packages.
 flutter:
-
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
@@ -59,9 +72,10 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
-    - assets/images/
+    - assets/webp/
     - assets/lotties/
     - assets/png/
+    - .env
     #   - images/a_dot_burr.jpeg
     #   - images/a_dot_ham.jpeg
     # An image asset can refer to one or more resolution-specific "variants", see

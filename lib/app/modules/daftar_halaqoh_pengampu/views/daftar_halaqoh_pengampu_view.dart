@@ -8,7 +8,7 @@ import '../controllers/daftar_halaqoh_pengampu_controller.dart';
 
 class DaftarHalaqohPengampuView
     extends GetView<DaftarHalaqohPengampuController> {
-   DaftarHalaqohPengampuView({super.key});
+  DaftarHalaqohPengampuView({super.key});
 
   final data = Get.arguments;
 
@@ -16,91 +16,108 @@ class DaftarHalaqohPengampuView
   Widget build(BuildContext context) {
     // print("data = $data");
     return FutureBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        future: controller.getDaftarHalaqohPengampu(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasData) {
-            return Scaffold(
-                appBar: AppBar(
-                  title: Text(data),
-                  centerTitle: true,
-                ),
-                body: ListView.builder(
-                  itemCount: snapshot.data!.docs.length,
-                  itemBuilder: (context, index) {
-                    var doc = (snapshot.data as QuerySnapshot).docs[index];
-                    return ListTile(
-                      onTap: () {
-                        String getNama =
-                                  snapshot.data!.docs[index].data()['nisn'];
-                              Get.toNamed(Routes.DETAIL_SISWA, arguments: getNama);
-                      },
-                      leading: Container(
-                        height: 50,
-                        width: 50,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(50),
-                          image: DecorationImage(
-                              image: NetworkImage(
-                                  "https://ui-avatars.com/api/?name=${doc['namasiswa']}")),
+      future: controller.getDaftarHalaqohPengampu(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasData) {
+          return Scaffold(
+            appBar: AppBar(title: Text(data), centerTitle: true),
+            body: ListView.builder(
+              itemCount: snapshot.data!.docs.length,
+              itemBuilder: (context, index) {
+                var doc = (snapshot.data as QuerySnapshot).docs[index];
+                final String? imageUrlFromDb = doc['profileImageUrl'];
+
+                final ImageProvider imageProvider;
+                // Cek apakah URL dari DB valid (tidak null dan tidak kosong)
+                if (imageUrlFromDb != null && imageUrlFromDb.isNotEmpty) {
+                  imageProvider = NetworkImage(imageUrlFromDb);
+                } else {
+                  // Jika tidak, gunakan aset lokal
+                  // imageProvider = const AssetImage('assets/png/logo.png');
+                  imageProvider = NetworkImage(
+                    "https://ui-avatars.com/api/?name=${doc['namasiswa']}",
+                  );
+                }
+                return ListTile(
+                  onTap: () {
+                    String getNama = snapshot.data!.docs[index].data()['nisn'];
+                    Get.toNamed(Routes.DETAIL_SISWA, arguments: getNama);
+                  },
+                  leading: Container(
+                    height: 50,
+                    width: 50,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(50),
+                      image: DecorationImage(
+                        // image: NetworkImage(
+                        //     "https://ui-avatars.com/api/?name=${doc['namasiswa']}")),
+                        image: imageProvider,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                  title: Text(doc['namasiswa'] ?? 'No Data'),
+                  subtitle: Text(doc['kelas'] ?? 'No Data'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      GestureDetector(
+                        onTap: () {
+                          var dataNya = snapshot.data!.docs[index].data();
+                          Get.toNamed(
+                            Routes.PEMBERIAN_NILAI_HALAQOH,
+                            // arguments: snapshot.data!.docs[index].data()['namasiswa']);
+                            arguments: dataNya,
+                          );
+                          // print('datamua = ${snapshot.data!.docs[index].data()}');
+                        },
+                        child: SizedBox(
+                          height: 40,
+                          width: 40,
+                          // color: Colors.amber,
+                          child: Icon(Icons.add_box_outlined),
                         ),
                       ),
-                      title: Text(doc['namasiswa'] ?? 'No Data'),
-                      subtitle: Text(doc['kelas'] ?? 'No Data'),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
 
-                          GestureDetector(
-                            onTap:() {
-                              var dataNya = snapshot.data!.docs[index].data();
-                                Get.toNamed(Routes.PEMBERIAN_NILAI_HALAQOH,
-                                    // arguments: snapshot.data!.docs[index].data()['namasiswa']);
-                                    arguments: dataNya);
-                                    // print('datamua = ${snapshot.data!.docs[index].data()}');
-                            } ,
-                            child: SizedBox(
-                                height: 40,
-                                width: 40,
-                                // color: Colors.amber,
-                                child: Icon(Icons.add_box_outlined)),
-                          ),
-
-                          GestureDetector(
-                            onTap:() {
-                              Map<String, dynamic> dataNya = snapshot.data!.docs[index].data();
-                              Get.toNamed(Routes.DAFTAR_NILAI, arguments: dataNya);
-                            },
-                            child: SizedBox(
-                                height: 40,
-                                width: 40,
-                                // color: Colors.amber,
-                                child: Icon(Icons.book)),
-                          
-                          ),
-
-                          // SizedBox(
-                          //   height: 40,
-                          //   width: 40,
-                          //   child: Checkbox(
-                          //     value: false,
-                          //     onChanged: (bool? value) {
-                          //       // Handle checkbox state change here
-                          //     },
-                          //   ),
-                          // )
-                        ],
+                      GestureDetector(
+                        onTap: () {
+                          Map<String, dynamic> dataNya =
+                              snapshot.data!.docs[index].data();
+                          Get.toNamed(Routes.DAFTAR_NILAI, arguments: dataNya);
+                        },
+                        child: SizedBox(
+                          height: 40,
+                          width: 40,
+                          // color: Colors.amber,
+                          child: Icon(Icons.book),
+                        ),
                       ),
-                    );
-                  },
-                ));
-           } else {
-            return Center(
-              child: Text('Terjadi kesalahan, Periksa koneksi internet'),
-            );
-          }
-        });
+
+                      // SizedBox(
+                      //   height: 40,
+                      //   width: 40,
+                      //   child: Checkbox(
+                      //     value: false,
+                      //     onChanged: (bool? value) {
+                      //       // Handle checkbox state change here
+                      //     },
+                      //   ),
+                      // )
+                    ],
+                  ),
+                );
+              },
+            ),
+          );
+        } else {
+          return Center(
+            child: Text('Terjadi kesalahan, Periksa koneksi internet'),
+          );
+        }
+      },
+    );
   }
 }

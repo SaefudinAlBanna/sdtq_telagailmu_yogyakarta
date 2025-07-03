@@ -3,24 +3,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 
-// Add this import if MataPelajaranConverter is defined elsewhere
-// import 'path_to_mata_pelajaran_converter.dart';
 
-// Define MataPelajaranConverter if not already defined
-class MataPelajaranConverter {
-  MataPelajaranConverter();
+// --- MODEL BARU UNTUK INFO KELAS ---
+// Ini membantu kita mengelola state dengan lebih bersih
+class KelasInfo {
+  final bool isSet; // Apakah wali kelas sudah ada?
+  final String? namaWaliKelas; // Siapa nama wali kelasnya?
 
-  // Example implementation, adjust as needed for your model
-  Map<String, dynamic> fromFirestore(
-    DocumentSnapshot<Map<String, dynamic>> snapshot,
-    _,
-  ) {
-    return snapshot.data()!;
-  }
-
-  Map<String, dynamic> toFirestore(Map<String, dynamic> mataPelajaran, _) {
-    return mataPelajaran;
-  }
+  KelasInfo({required this.isSet, this.namaWaliKelas});
 }
 
 class PemberianKelasSiswaController extends GetxController {
@@ -41,19 +31,96 @@ class PemberianKelasSiswaController extends GetxController {
   String idSekolah = 'P9984539';
   String emailAdmin = FirebaseAuth.instance.currentUser!.email!;
 
-  late Stream<QuerySnapshot<Map<String, dynamic>>> tampilkanSiswa;
+  // --- STATE MANAGEMENT BARU ---
+  var kelasInfo = Rxn<KelasInfo>(); // State untuk info wali kelas (bisa null saat loading)
+
+   // --- PERUBAHAN 1: Jadikan stream reaktif dan nullable ---
+  var tampilkanSiswa = Rxn<Stream<QuerySnapshot<Map<String, dynamic>>>>();
+
+  String? _tempWaliKelas;
+
+  // late Stream<QuerySnapshot<Map<String, dynamic>>> tampilkanSiswa;
 
   @override
   void onInit() {
     super.onInit();
+    // Panggil fungsi untuk mengambil data awal saat controller siap
+    loadInitialData(); 
+    // tampilkanSiswa = FirebaseFirestore.instance
+    //     .collection('Sekolah').doc(idSekolah)
+    //     .collection('siswa').where('status', isNotEqualTo: 'aktif')
+    //     .snapshots();
+  }
 
-    tampilkanSiswa =
-        FirebaseFirestore.instance
-            .collection('Sekolah')
-            .doc(idSekolah)
-            .collection('siswa')
-            .where('status', isNotEqualTo: 'aktif')
-            .snapshots();
+  // --- FUNGSI BARU UNTUK MENGAKTIFKAN STREAM ---
+  void _activateSiswaStream() {
+    tampilkanSiswa.value = FirebaseFirestore.instance
+        .collection('Sekolah')
+        .doc(idSekolah)
+        .collection('siswa')
+        .where('status', isNotEqualTo: 'aktif')
+        .snapshots();
+  }
+
+  // --- FUNGSI BARU UNTUK MENGAMBIL DATA AWAL ---
+  Future<void> loadInitialData() async {
+  // SOLUSI: Aktifkan stream siswa di awal, karena tidak bergantung pada data kelas.
+  _activateSiswaStream();
+
+  try {
+    String tahunajaranya = await getTahunAjaranTerakhir();
+    String idTahunAjaran = tahunajaranya.replaceAll("/", "-");
+
+    final docRef = firestore
+        .collection('Sekolah').doc(idSekolah)
+        .collection('tahunajaran').doc(idTahunAjaran)
+        .collection('kelastahunajaran').doc(argumentKelas);
+    
+    final docSnap = await docRef.get();
+
+    if (docSnap.exists && (docSnap.data()?['walikelas'] != null && docSnap.data()!['walikelas'].isNotEmpty)) {
+      // KONDISI A: Kelas ada dan wali kelas sudah terisi
+      String namaWali = docSnap.data()!['walikelas'];
+      waliKelasSiswaC.text = namaWali;
+      kelasInfo.value = KelasInfo(isSet: true, namaWaliKelas: namaWali);
+      // Pemanggilan _activateSiswaStream() sudah dipindahkan ke atas
+    } else {
+      // KONDISI B: Kelas baru atau walikelasnya kosong
+      kelasInfo.value = KelasInfo(isSet: false);
+    }
+  } catch (e) {
+    Get.snackbar("Error", "Gagal memuat data kelas: $e");
+    kelasInfo.value = KelasInfo(isSet: false);
+  }
+}
+
+  // --- FUNGSI BARU UNTUK MENangani PERUBAHAN DROPDOWN ---
+  void onWaliKelasSelected(String? waliKelas) {
+  if (waliKelas != null && waliKelas.isNotEmpty) {
+    // Gunakan Future.delayed untuk menunda pembaruan state hingga setelah
+    // siklus build saat ini selesai.
+    Future.delayed(Duration(milliseconds: 500), () {
+      // Semua pembaruan state yang memicu rebuild UI dimasukkan ke sini.
+      waliKelasSiswaC.text = waliKelas; 
+      kelasInfo.value = KelasInfo(isSet: true, namaWaliKelas: waliKelas);
+    });
+  }
+}
+
+  // --- FUNGSI BARU ---
+  // Fungsi ini dipanggil setelah popup dropdown tertutup.
+  // Di sinilah kita melakukan update state.
+  void commitWaliKelasSelection() {
+    // Ambil nilai dari variabel sementara
+    final selectedWali = _tempWaliKelas;
+
+    if (selectedWali != null && selectedWali.isNotEmpty) {
+      waliKelasSiswaC.text = selectedWali;
+      kelasInfo.value = KelasInfo(isSet: true, namaWaliKelas: selectedWali);
+      _activateSiswaStream();
+    }
+    // Kosongkan kembali variabel sementara untuk persiapan berikutnya
+    _tempWaliKelas = null;
   }
 
   Future<String> getTahunAjaranTerakhir() async {
@@ -71,40 +138,36 @@ class PemberianKelasSiswaController extends GetxController {
   }
 
   Future<List<String>> getDataWaliKelasBaru() async {
-    List<String> waliKelasBaruList = [];
-
     String tahunajaranya = await getTahunAjaranTerakhir();
     String idTahunAjaran = tahunajaranya.replaceAll("/", "-");
 
-    QuerySnapshot<Map<String, dynamic>> snapKelas =
-        await firestore
-            .collection('Sekolah')
-            .doc(idSekolah)
-            .collection('tahunajaran')
-            .doc(idTahunAjaran)
-            .collection('kelastahunajaran')
-            .get();
+    // Langkah 1: Buat daftar SEMUA wali kelas yang sudah ada di tahun ajaran ini
+    QuerySnapshot<Map<String, dynamic>> snapKelasSaatIni = await firestore
+        .collection('Sekolah').doc(idSekolah)
+        .collection('tahunajaran').doc(idTahunAjaran)
+        .collection('kelastahunajaran').get();
+    
+    // Gunakan Set untuk performa yang lebih cepat dan data yang unik
+    final Set<String> waliKelasYangSudahAda = snapKelasSaatIni.docs
+        .map((doc) => doc.data()['walikelas'] as String?)
+        .where((wali) => wali != null && wali.isNotEmpty)
+        .cast<String>()
+        .toSet();
 
-    String namaWalikelas =
-        snapKelas.docs.isNotEmpty
-            ? snapKelas.docs.first.data()['walikelas']
-            : '';
-
-    await firestore
-        .collection('Sekolah')
-        .doc(idSekolah)
+    // Langkah 2: Ambil semua guru yang berpotensi menjadi wali kelas
+    QuerySnapshot<Map<String, dynamic>> snapSemuaGuru = await firestore
+        .collection('Sekolah').doc(idSekolah)
         .collection('pegawai')
-        .where('alias', isNotEqualTo: namaWalikelas)
-        .get()
-        .then((querySnapshot) {
-          for (var docSnapshot in querySnapshot.docs.where(
-            (doc) => doc['role'] == 'Guru Kelas',
-          )) {
-            waliKelasBaruList.add(docSnapshot.data()['alias']);
-            // waliKelasBaruList.add(docSnapshot.data()['nip']);
-          }
-        });
-    return waliKelasBaruList;
+        .where('role', isEqualTo: 'Guru Kelas')
+        .get();
+
+    // Langkah 3: Saring daftar guru, buang yang sudah jadi wali kelas
+    final List<String> waliKelasTersedia = snapSemuaGuru.docs
+        .map((doc) => doc.data()['alias'] as String)
+        .where((namaAlias) => !waliKelasYangSudahAda.contains(namaAlias))
+        .toList();
+        
+    return waliKelasTersedia;
   }
 
   Future<QuerySnapshot<Map<String, dynamic>>> getDataWali() async {
@@ -593,6 +656,13 @@ class PemberianKelasSiswaController extends GetxController {
   }
 
   Future<void> simpanKelasBaruLagi(String namaSiswa, String nisnSiswa) async {
+
+     // Tambahkan validasi di awal
+    if (waliKelasSiswaC.text.isEmpty) {
+      Get.snackbar("Peringatan", "Wali kelas belum dipilih!");
+      return;
+    }
+
     isLoadingTambahKelas.value = true;
 
     // Mulai loading
@@ -870,13 +940,19 @@ class PemberianKelasSiswaController extends GetxController {
     } catch (e) {
       // Tangani error yang lebih spesifik
       if (e is FirebaseException) {
-        // print('FirebaseException: ${e.code} - ${e.message}');
+        
+        print('FirebaseException: ${e.code} - ${e.message}');
         Get.snackbar(
           'Error Firestore',
           'Terjadi kesalahan Firestore: ${e.message}',
         );
       } else {
-        // print('Exception: $e');
+        print('Exception: $e');
+        print("nisnSiswa = $nisnSiswa");
+        print("namaSiswa = $namaSiswa");
+        print("argumentKelas = $argumentKelas");
+        print("waliKelasSiswaC.text = ${waliKelasSiswaC.text}");
+
         Get.snackbar('Error', 'Terjadi kesalahan: $e');
       }
     } finally {

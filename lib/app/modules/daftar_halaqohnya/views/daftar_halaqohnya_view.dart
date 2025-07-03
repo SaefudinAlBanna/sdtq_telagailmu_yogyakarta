@@ -1,652 +1,491 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
-
 import 'package:get/get.dart';
-
-import '../../../routes/app_pages.dart';
+import 'package:dropdown_search/dropdown_search.dart';
+import '../../../models/siswa_halaqoh.dart';
 import '../controllers/daftar_halaqohnya_controller.dart';
+import '../../../routes/app_pages.dart'; // Jika dibutuhkan
 
 class DaftarHalaqohnyaView extends GetView<DaftarHalaqohnyaController> {
-  DaftarHalaqohnyaView({super.key});
-
-  final dataArgumen = Get.arguments;
+  const DaftarHalaqohnyaView({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      drawer: Drawer(
-        shadowColor: Colors.red,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.only(
-            bottomRight: Radius.circular(30),
-            topRight: Radius.circular(30),
-          ),
+      return Scaffold(
+            appBar: AppBar(
+              // Foto pengampu di samping judul
+              title: Obx(() => Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: Colors.white,
+                    // Tampilkan foto pengampu, jika tidak ada tampilkan inisial
+                    backgroundImage: controller.urlFotoPengampu.value != null
+                        ? NetworkImage(controller.urlFotoPengampu.value!)
+                        : null,
+                    child: controller.urlFotoPengampu.value == null
+                        ? Text(controller.namaPengampu.value.isNotEmpty ? controller.namaPengampu.value[0] : 'P')
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+            Text(controller.namaPengampu.value),
+          ],
+          
+        )),
+        centerTitle: true,
+        actions: [
+          IconButton(
+          tooltip: 'Riwayat Pindah Halaqoh',
+          icon: const Icon(Icons.history_rounded),
+          onPressed: _showRiwayatPindahDialog, // Panggil dialog riwayat
         ),
-        width: 230,
-        child: Column(
-          children: [
-            Container(
-              padding: EdgeInsets.all(15),
-              height: 150,
-              width: 230,
-              color: Colors.grey,
-              alignment: Alignment.bottomLeft,
-              child: Align(
-                alignment: Alignment.bottomLeft,
-                child: Text(
-                  'Menu',
-                  style: TextStyle(fontSize: 25, fontWeight: FontWeight.w300),
+        IconButton(
+          tooltip: 'Update Al-Husna Massal',
+          icon: const Icon(Icons.edit_note_rounded),
+          onPressed: _showBulkUpdateDialog,
+        ),
+          IconButton(
+            tooltip: 'Tambah Siswa',
+            icon: const Icon(Icons.person_add_alt_1_rounded),
+            onPressed: _showPilihKelasDialog, // Panggil dialog pertama
+          ),
+        ],
+      ),
+      body: Obx(() {
+        if (controller.isLoading.value) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (controller.daftarSiswa.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.group_add_outlined, size: 80, color: Colors.grey.shade400),
+                    const SizedBox(height: 16),
+                    const Text(
+                      "Belum Ada Siswa",
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      "Kelompok ini masih kosong. Tambahkan siswa pertama Anda untuk memulai.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.person_add_alt_1_rounded),
+                      label: const Text("Tambah Siswa"),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: _showPilihKelasDialog, // Langsung panggil aksi
+                    ),
+                  ],
                 ),
               ),
-            ),
-            ListTile(
-              onTap: () {
-                Get.back();
-                Get.defaultDialog(
-                  title: '${dataArgumen['fase']}',
-                  content: SizedBox(
-                    // height: 450,
-                    // width: 350,
-                    child: Column(
+            );
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.all(8.0),
+          itemCount: controller.daftarSiswa.length,
+          itemBuilder: (context, index) {
+            final siswa = controller.daftarSiswa[index];
+            return _buildSiswaCard(siswa);
+          },
+        );
+      }),
+    );
+  }
+
+  void _showRiwayatPindahDialog() {
+  Get.dialog(
+    AlertDialog(
+      title: const Text("Riwayat Pindah Halaqoh"),
+      content: SizedBox(
+        width: double.maxFinite,
+        height: Get.height * 0.6,
+        child: FutureBuilder<List<Map<String, dynamic>>>(
+          future: controller.getRiwayatPindah(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              return const Center(child: Text("Tidak ada riwayat perpindahan."));
+            }
+
+            final riwayatList = snapshot.data!;
+            return ListView.builder(
+              itemCount: riwayatList.length,
+              itemBuilder: (context, index) {
+                final riwayat = riwayatList[index];
+                
+                // Cek apakah siswa ini keluar atau masuk
+                final bool isKeluar = riwayat['dariPengampu'] == controller.namaPengampu.value;
+                final Timestamp timestamp = riwayat['tanggalPindah'] ?? Timestamp.now();
+                final date = timestamp.toDate();
+                // Format tanggal sederhana, bisa lebih bagus dengan package 'intl'
+                final formattedDate = "${date.day}/${date.month}/${date.year}";
+
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 6),
+                  color: isKeluar ? Colors.red.shade50 : Colors.green.shade50,
+                  child: ListTile(
+                    leading: Icon(
+                      isKeluar ? Icons.arrow_circle_up_rounded : Icons.arrow_circle_down_rounded,
+                      color: isKeluar ? Colors.red.shade700 : Colors.green.shade700,
+                    ),
+                    title: Text(riwayat['namaSiswa'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Column(
-                          children: [
-                            SizedBox(height: 5),
-                            FutureBuilder<List<String>>(
-                              future: controller.getDataKelasYangAda(),
-                              builder: (context, snapshotkelas) {
-                                // print('ini snapshotkelas = $snapshotkelas');
-                                if (snapshotkelas.connectionState ==
-                                    ConnectionState.waiting) {
-                                  return CircularProgressIndicator();
-                                } else if (snapshotkelas.hasData) {
-                                  List<String> kelasAjarGuru =
-                                      snapshotkelas.data!;
-                                  return SingleChildScrollView(
-                                    child: Row(
-                                      children:
-                                          kelasAjarGuru.map((k) {
-                                            return TextButton(
-                                              onPressed: () {
-                                                Get.back();
-                                                controller.kelasSiswaC.text = k;
-                                                Get.bottomSheet(
-                                                  Container(
-                                                    padding:
-                                                        EdgeInsets.symmetric(
-                                                          horizontal: 30,
-                                                          vertical: 30,
-                                                        ),
-                                                    color: Colors.white,
-                                                    child: Center(
-                                                      child: StreamBuilder<
-                                                        QuerySnapshot<
-                                                          Map<String, dynamic>
-                                                        >
-                                                      >(
-                                                        stream:
-                                                            controller
-                                                                .getDataSiswaStreamBaru(),
-                                                        builder: (
-                                                          context,
-                                                          snapshotsiswa,
-                                                        ) {
-                                                          if (snapshotsiswa
-                                                                  .connectionState ==
-                                                              ConnectionState
-                                                                  .waiting) {
-                                                            return CircularProgressIndicator();
-                                                          }
-                                                          if (snapshotsiswa
-                                                                  .data!
-                                                                  .docs
-                                                                  .isEmpty ||
-                                                              snapshotsiswa
-                                                                      .data ==
-                                                                  null) {
-                                                            return Center(
-                                                              child: Text(
-                                                                'Semua siswa sudah terpilih',
-                                                              ),
-                                                            );
-                                                          }
-                                                          if (snapshotsiswa
-                                                              .hasData) {
-                                                            return ListView.builder(
-                                                              itemCount:
-                                                                  snapshotsiswa
-                                                                      .data!
-                                                                      .docs
-                                                                      .length,
-                                                              itemBuilder: (
-                                                                context,
-                                                                index,
-                                                              ) {
-                                                                String
-                                                                namaSiswa =
-                                                                    snapshotsiswa
-                                                                        .data!
-                                                                        .docs[index]
-                                                                        .data()['namasiswa'] ??
-                                                                    'No Name';
-                                                                String
-                                                                nisnSiswa =
-                                                                    snapshotsiswa
-                                                                        .data!
-                                                                        .docs[index]
-                                                                        .data()['nisn'] ??
-                                                                    'No NISN';
-                                                                // ignore: prefer_is_empty
-                                                                if (snapshotsiswa
-                                                                            .data!
-                                                                            .docs
-                                                                            .length ==
-                                                                        0 ||
-                                                                    snapshotsiswa
-                                                                        .data!
-                                                                        .docs
-                                                                        .isEmpty) {
-                                                                  return Center(
-                                                                    child: Text(
-                                                                      'Semua siswa sudah terpilih',
-                                                                    ),
-                                                                  );
-                                                                } else {
-                                                                  return ListTile(
-                                                                    onTap:
-                                                                        () => controller.simpanSiswaKelompok(
-                                                                          namaSiswa,
-                                                                          nisnSiswa,
-                                                                        ),
-                                                                    title: Text(
-                                                                      snapshotsiswa
-                                                                          .data!
-                                                                          .docs[index]
-                                                                          .data()['namasiswa'],
-                                                                    ),
-                                                                    subtitle: Text(
-                                                                      snapshotsiswa
-                                                                          .data!
-                                                                          .docs[index]
-                                                                          .data()['namakelas'],
-                                                                    ),
-                                                                    leading: CircleAvatar(
-                                                                      child: Text(
-                                                                        snapshotsiswa
-                                                                            .data!
-                                                                            .docs[index]
-                                                                            .data()['namasiswa'][0],
-                                                                      ),
-                                                                    ),
-                                                                    trailing: Row(
-                                                                      mainAxisSize:
-                                                                          MainAxisSize
-                                                                              .min,
-                                                                      children: <
-                                                                        Widget
-                                                                      >[
-                                                                        IconButton(
-                                                                          tooltip:
-                                                                              'Simpan',
-                                                                          icon: const Icon(
-                                                                            Icons.save,
-                                                                          ),
-                                                                          onPressed: () {
-                                                                            controller.simpanSiswaKelompok(
-                                                                              namaSiswa,
-                                                                              nisnSiswa,
-                                                                            );
-                                                                          },
-                                                                        ),
-                                                                      ],
-                                                                    ),
-                                                                  );
-                                                                }
-                                                              },
-                                                            );
-                                                          } else {
-                                                            return Center(
-                                                              child: Text(
-                                                                'No data available',
-                                                              ),
-                                                            );
-                                                          }
-                                                        },
-                                                      ),
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                              child: Text(k),
-                                            );
-                                          }).toList(),
-                                    ),
-                                  );
-                                } else {
-                                  return SizedBox();
-                                }
-                              },
-                            ),
-                          ],
-                        ),
+                        Text(isKeluar
+                          ? "Pindah ke: ${riwayat['kePengampu']}"
+                          : "Pindah dari: ${riwayat['dariPengampu']}"),
+                        if (riwayat['alasan'] != 'Tidak ada alasan')
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4.0),
+                            child: Text("Alasan: ${riwayat['alasan']}", style: const TextStyle(fontStyle: FontStyle.italic)),
+                          ),
                       ],
                     ),
-                  ),
-                );
-              },
-              leading: Icon(Icons.person_add_sharp),
-              title: Text('Tambah Siswa'),
-            ),
-            ListTile(
-              onTap: () => Get.offAllNamed(Routes.HOME),
-              title: Text("kembali"),
-              // subtitle: t,
-            ),
-
-            ListTile(
-              onTap: () {
-                Get.defaultDialog(
-                  onCancel: () {},
-                  title: "Pilih kategori",
-                  content: Column(
-                    children: [
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          DropdownSearch<String>(
-                            decoratorProps: DropDownDecoratorProps(
-                              decoration: InputDecoration(
-                                labelText: "Kategori Al-Husna",
-                                border: OutlineInputBorder(),
-                                filled: true,
-                              ),
-                            ),
-                            items:
-                                (f, cs) =>
-                                    Future.value(controller.getDataAlHusna()),
-                            onChanged: (String? value) {
-                              if (value != null) {
-                                controller.alhusnadrawerC.text = value;
-                              }
-                            },
-                            popupProps: PopupProps.menu(
-                              showSearchBox: true,
-                              fit: FlexFit.loose, // Coba loose atau tight
-                              constraints: BoxConstraints(
-                                maxHeight: 300,
-                              ), // Batasi tinggi popup
-                            ),
-                          ),
-                          SizedBox(height: 20),
-                          Center(
-                            child: ElevatedButton(
-                              onPressed: () {
-                                // ignore: unnecessary_null_comparison
-                                if (controller.alhusnadrawerC.text == null ||
-                                    // ignore: unnecessary_null_comparison
-                                    controller.alhusnadrawerC.text.isEmpty) {
-                                  Get.snackbar(
-                                    'Peringatan',
-                                    'Kategori Al-Hunsa belum dipilih',
-                                    snackPosition: SnackPosition.BOTTOM,
-                                  );
-                                } else {
-                                  Get.back();
-
-                                  Get.bottomSheet(
-                                    Container(
-                                      color: Colors.white,
-                                      // Bungkus dengan Container untuk memberi batasan tinggi
-                                      constraints: BoxConstraints(
-                                        maxHeight:
-                                            Get.height *
-                                            0.8, // Maks 80% tinggi layar
-                                      ),
-                                      child: StreamBuilder<
-                                        QuerySnapshot<Map<String, dynamic>>
-                                      >(
-                                        stream:
-                                            controller.getDaftarHalaqohDrawer(),
-                                        builder: (context, snapshot) {
-                                          if (snapshot.connectionState ==
-                                              ConnectionState.waiting) {
-                                            return Center(
-                                              child:
-                                                  CircularProgressIndicator(),
-                                            );
-                                          }
-                                          if (snapshot.data == null ||
-                                              snapshot.data!.docs.isEmpty) {
-                                            return Center(
-                                              child: Text(
-                                                'Belum ada siswa atau semua siswa pada kategori ${controller.alhusnadrawerC.text}',
-                                              ),
-                                            );
-                                          }
-                                          if (snapshot.hasData) {
-                                            return ListView.builder(
-                                              itemCount:
-                                                  snapshot.data!.docs.length,
-                                              // itemCount: 5,
-                                              itemBuilder: (context, index) {
-                                                var doc =
-                                                    (snapshot.data
-                                                            as QuerySnapshot)
-                                                        .docs[index];
-                                                return InkWell(
-                                                  onTap: () {
-                                                    controller.updateAlHusnaDrawer(
-                                                      doc.id,
-                                                    );
-                                                  },
-                                                  child: Container(
-                                                    height: 50,
-                                                    margin: EdgeInsets.fromLTRB(
-                                                      10,
-                                                      5,
-                                                      10,
-                                                      7,
-                                                    ),
-                                                    padding: EdgeInsets.all(5),
-                                                    decoration: BoxDecoration(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            15,
-                                                          ),
-                                                      // color: Colors.green[200]
-                                                      color: Colors.amber,
-                                                    ),
-                                                    child: Column(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      mainAxisSize:
-                                                          MainAxisSize.min,
-                                                      children: [
-                                                        Text(
-                                                          doc['namasiswa'] ??
-                                                              'No Data',
-                                                        ),
-                                                        Text(
-                                                          doc['kelas'] ??
-                                                              'No Data',
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                            );
-                                          } else {
-                                            return Center(
-                                              child: Text('No data available'),
-                                            );
-                                          }
-                                        },
-                                      ),
-                                    ),
-                                  );
-                                }
-                              },
-                              child: Text("Pilih Siswa"),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                );
-              },
-              leading: Icon(Icons.list_alt_outlined),
-              title: Text("Tentukan Kategori"),
-            ),
-
-            ListTile(
-              onTap:
-                  () =>
-                  // controller.test(),
-                  Get.toNamed(Routes.DAFTAR_HALAQOH_PERFASE),
-              leading: Icon(Icons.arrow_back_outlined),
-              title: Text("Kembali"),
-            ),
-          ],
-        ),
-      ),
-
-      appBar: AppBar(
-        title: const Text('DaftarHalaqohnyaView'),
-        centerTitle: true,
-      ),
-      body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        stream: controller.getDataSiswaHalaqoh(),
-        builder: (context, snapsiswahalaqoh) {
-          if (snapsiswahalaqoh.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapsiswahalaqoh.data == null ||
-              snapsiswahalaqoh.data!.docs.isEmpty) {
-            return const Center(child: Text('Tidak ada data'));
-          }
-          if (snapsiswahalaqoh.hasData) {
-            return ListView.builder(
-              itemCount: snapsiswahalaqoh.data!.docs.length,
-              itemBuilder: (context, index) {
-                // print("lenght == ${snapsiswahalaqoh.data!.docs.length}"); // ya kriwel tidak dihitung
-                var snapsiswa = snapsiswahalaqoh.data!.docs[index];
-                return Material(
-                  borderRadius: BorderRadius.circular(15),
-                  child: InkWell(
-                    onTap: () {
-                      Get.defaultDialog(
-                        onCancel: () => Get.back(),
-                        onConfirm: () {
-                          controller.updateAlHusna(snapsiswa.id);
-                        },
-                        title: "Kategori Al-Hunsa",
-
-                        content: Column(
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                DropdownSearch<String>(
-                                  decoratorProps: DropDownDecoratorProps(
-                                    decoration: InputDecoration(
-                                      border: OutlineInputBorder(),
-                                      filled: true,
-                                      prefixText: 'Al-Husna : ',
-                                    ),
-                                  ),
-                                  selectedItem: controller.alhusnaC.text,
-                                  items: (f, cs) => controller.getDataAlHusna(),
-                                  onChanged: (String? value) {
-                                    controller.alhusnaC.text = value!;
-                                  },
-                                  popupProps: PopupProps.menu(
-                                    // disabledItemFn: (item) => item == '1A', // contoh klo mau disable
-                                    fit: FlexFit.tight,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.all(10),
-                      padding: EdgeInsets.all(5),
-                      decoration: BoxDecoration(
-                        color: Colors.blue,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    snapsiswa['namasiswa'],
-                                    style: TextStyle(fontSize: 15),
-                                  ),
-                                  Text(snapsiswa['kelas']),
-                                ],
-                              ),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    onPressed: () {
-                                      Get.toNamed(
-                                        Routes.DAFTAR_NILAI,
-                                        arguments: snapsiswa,
-                                      );
-                                    },
-                                    icon: Icon(Icons.add_box_outlined),
-                                  ),
-                                  IconButton(
-                                    icon: Icon(Icons.rocket_outlined),
-                                    onPressed: () async {
-                                      if (controller.isLoading.isFalse) {
-                                        String nisnSiswa = snapsiswa['nisn'];
-                                        await Get.defaultDialog(
-                                          barrierDismissible: false,
-                                          title: '${snapsiswa['fase']}',
-                                          content: SizedBox(
-                                            height: 350,
-                                            width: 400,
-                                            child: Column(
-                                              children: [
-                                                Column(
-                                                  children: [
-                                                    SizedBox(height: 20),
-                                                    DropdownSearch<String>(
-                                                      decoratorProps:
-                                                          DropDownDecoratorProps(
-                                                            decoration:
-                                                                InputDecoration(
-                                                                  border:
-                                                                      OutlineInputBorder(),
-                                                                  filled: true,
-                                                                  labelText:
-                                                                      'Pengampu',
-                                                                ),
-                                                          ),
-                                                      selectedItem:
-                                                          controller
-                                                                  .pengampuC
-                                                                  .text
-                                                                  .isNotEmpty
-                                                              ? controller
-                                                                  .pengampuC
-                                                                  .text
-                                                              : null,
-                                                      items:
-                                                          (f, cs) =>
-                                                              controller
-                                                                  .getDataPengampuFase(),
-                                                      onChanged: (
-                                                        String? value,
-                                                      ) {
-                                                        if (value != null) {
-                                                          controller
-                                                              .pengampuC
-                                                              .text = value;
-                                                        }
-                                                      },
-                                                      popupProps:
-                                                          PopupProps.menu(
-                                                            fit: FlexFit.tight,
-                                                          ),
-                                                    ),
-                                                    SizedBox(height: 20),
-                                                    TextField(
-                                                      controller:
-                                                          controller.alasanC,
-                                                      decoration: InputDecoration(
-                                                        border:
-                                                            OutlineInputBorder(),
-                                                        hintText:
-                                                            'Alasan Pindah',
-                                                      ),
-                                                    ),
-                                                    SizedBox(height: 20),
-                                                    Column(
-                                                      children: [
-                                                        Obx(
-                                                          () => ElevatedButton(
-                                                            onPressed: () async {
-                                                              if (controller
-                                                                  .isLoading
-                                                                  .isFalse) {
-                                                                await controller
-                                                                    .pindahkan(
-                                                                      nisnSiswa,
-                                                                    );
-                                                                controller
-                                                                    .getDataSiswaHalaqoh();
-                                                              }
-                                                            },
-                                                            child: Text(
-                                                              controller
-                                                                      .isLoading
-                                                                      .isFalse
-                                                                  ? "Pindah halaqoh"
-                                                                  : "LOADING...",
-                                                            ),
-                                                            // child: Text("Pindah halaqoh"),
-                                                          ),
-                                                        ),
-                                                        SizedBox(height: 20),
-                                                        ElevatedButton(
-                                                          onPressed: () {
-                                                            Get.back();
-                                                          },
-                                                          child: Text(
-                                                            controller
-                                                                    .isLoading
-                                                                    .isFalse
-                                                                ? "Batal"
-                                                                : "LOADING...",
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ],
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        );
-                                      } else {
-                                        Center(
-                                          child: CircularProgressIndicator(),
-                                        );
-                                      }
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
+                    trailing: Text(formattedDate),
                   ),
                 );
               },
             );
-          } else {
-            return const Center(child: Text('Tidak ada data'));
-          }
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Get.back(),
+          child: const Text("Tutup"),
+        )
+      ],
+    ),
+  );
+}
+
+  // 2. Tambahkan FUNGSI DIALOG BARU di dalam class View
+void _showBulkUpdateDialog() {
+  // Pastikan daftar pilihan kosong sebelum dialog dibuka
+  controller.siswaTerpilihUntukUpdateMassal.clear(); 
+  controller.bulkUpdateAlhusnaC.clear();
+
+  Get.defaultDialog(
+    title: "Update Al-Husna Massal",
+    content: SizedBox(
+      width: Get.width,
+      height: Get.height * 0.5, // Beri batasan tinggi
+      child: Column(
+        children: [
+          // Dropdown untuk memilih level Al-Husna
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+            child: DropdownSearch<String>(
+              popupProps: const PopupProps.menu(showSearchBox: true, fit: FlexFit.loose),
+              items: (f, cs) => controller.listLevelAlhusna,
+              onChanged: (value) => controller.bulkUpdateAlhusnaC.text = value ?? '',
+              decoratorProps: const DropDownDecoratorProps(
+                decoration: InputDecoration(
+                  labelText: "Pilih Level Al-Husna Tujuan",
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ),
+          ),
+          const Divider(),
+          // Daftar siswa dengan checkbox
+          Expanded(
+            child: Obx(() => ListView.builder(
+              itemCount: controller.daftarSiswa.length,
+              itemBuilder: (context, index) {
+                final siswa = controller.daftarSiswa[index];
+                return Obx(() => CheckboxListTile(
+                  title: Text(siswa.nama),
+                  subtitle: Text("Level saat ini: ${siswa.alhusna}"),
+                  value: controller.siswaTerpilihUntukUpdateMassal.contains(siswa.nisn),
+                  onChanged: (isSelected) {
+                    if (isSelected == true) {
+                      controller.siswaTerpilihUntukUpdateMassal.add(siswa.nisn);
+                    } else {
+                      controller.siswaTerpilihUntukUpdateMassal.remove(siswa.nisn);
+                    }
+                  },
+                ));
+              },
+            )),
+          ),
+        ],
+      ),
+    ),
+    confirm: Obx(() => ElevatedButton(
+      onPressed: controller.isDialogLoading.value 
+        ? null 
+        : () => controller.updateAlHusnaMassal(),
+      child: controller.isDialogLoading.value
+          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+          : const Text("Simpan Perubahan"),
+    )),
+    cancel: TextButton(
+      onPressed: () => Get.back(),
+      child: const Text("Batal"),
+    ),
+  );
+}
+
+    /// Membangun Card Siswa yang sudah dipercantik
+  Widget _buildSiswaCard(SiswaHalaqoh siswa) {
+    return Material(
+      child: InkWell(
+        onTap: () {Get.toNamed(Routes.DAFTAR_NILAI, arguments: siswa.rawData);},
+        child: Card(
+          elevation: 3,
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+            child: Row(children: [
+              // Avatar Siswa dengan Fallback
+              CircleAvatar(
+                radius: 30,
+                backgroundColor: Colors.blueGrey.shade50,
+                backgroundImage: siswa.profileImageUrl != null
+                    ? NetworkImage(siswa.profileImageUrl!)
+                    : null,
+                child: siswa.profileImageUrl == null
+                    ? Text(
+                        siswa.nama.isNotEmpty ? siswa.nama[0] : 'S',
+                        style: const TextStyle(fontSize: 26, color: Colors.blueGrey),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 16),
+              // Informasi Siswa
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(siswa.nama, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                  const SizedBox(height: 4),
+                  Text("Kelas: ${siswa.kelas}", style: TextStyle(color: Colors.grey.shade700)),
+                  const SizedBox(height: 8),
+                  Chip(
+                    label: Text("Al-Husna: ${siswa.alhusna}",
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    backgroundColor: _getAlhusnaColor(siswa.alhusna), // <-- GUNAKAN HELPER
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  ),
+                ],
+              )),
+              // Tombol Aksi (PopupMenu)
+              PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'update') _showUpdateAlHusnaDialog(siswa);
+                if (value == 'pindah') _showPindahHalaqohDialog(siswa);
+                // if (value == 'nilai') {
+                //   Get.toNamed(Routes.DAFTAR_NILAI, arguments: siswa.rawData);
+                // }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(value: 'update', child: Text('Update Al-Husna')),
+                const PopupMenuItem(value: 'pindah', child: Text('Pindah Halaqoh')),
+                // const PopupMenuItem(value: 'nilai', child: Text('Input Nilai')),
+              ],
+            ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Dialog untuk mengupdate Al-Husna
+  void _showUpdateAlHusnaDialog(SiswaHalaqoh siswa) {
+    controller.alhusnaC.text = siswa.alhusna; // Set nilai awal
+    Get.defaultDialog(
+      title: "Update Al-Husna",
+      content: Column(
+        children: [
+          Text(siswa.nama, style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          // Anda bisa ganti DropdownSearch dengan DropdownButton biasa jika list-nya statis
+          // TextField(
+          //   controller: controller.alhusnaC,
+          //   decoration: const InputDecoration(labelText: "Level Al-Husna"),
+          // ),
+           DropdownSearch<String>(
+          popupProps: const PopupProps.menu(
+            showSearchBox: true,
+            fit: FlexFit.loose, // Agar menu tidak terlalu besar
+          ),
+          items: (f, cs) => controller.listLevelAlhusna,
+          selectedItem: controller.alhusnaC.text, // Tampilkan nilai yang sudah ada
+          onChanged: (value) {
+            controller.alhusnaC.text = value ?? ''; // Update controller saat dipilih
+          },
+          decoratorProps: const DropDownDecoratorProps(
+            decoration: InputDecoration(
+              labelText: "Level Al-Husna",
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ),
+        ],
+      ),
+      confirm: Obx(() => ElevatedButton(
+        onPressed: controller.isDialogLoading.value 
+          ? null 
+          : () => controller.updateAlHusna(siswa.nisn),
+        child: controller.isDialogLoading.value
+            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+            : const Text("Simpan"),
+      )),
+      cancel: TextButton(onPressed: () => Get.back(), child: const Text("Batal")),
+    );
+  }
+  
+  /// Dialog untuk memindahkan siswa
+  void _showPindahHalaqohDialog(SiswaHalaqoh siswa) {
+    Get.defaultDialog(
+      title: "Pindah Halaqoh",
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text("Pindahkan ${siswa.nama} ke kelompok:", style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          // Dropdown untuk memilih pengampu tujuan
+          FutureBuilder<List<String>>(
+            future: controller.getTargetPengampu(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const CircularProgressIndicator();
+              return DropdownSearch<String>(
+                popupProps: const PopupProps.menu(showSearchBox: true),
+                items: (f, cs) => snapshot.data ?? [],
+                onChanged: (value) => controller.pengampuPindahC.text = value ?? '',
+                decoratorProps: const DropDownDecoratorProps(
+                  decoration: InputDecoration(labelText: "Pengampu Tujuan"),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: controller.alasanPindahC,
+            decoration: const InputDecoration(labelText: "Alasan Pindah"),
+          ),
+        ],
+      ),
+      confirm: ElevatedButton(
+        onPressed: () {
+         // Panggil fungsi yang sudah dibuat di controller
+          controller.pindahkanSiswa(siswa); 
+        },
+        child: const Text("Pindahkan"),
+      ),
+      cancel: TextButton(onPressed: () => Get.back(), child: const Text("Batal")),
+    );
+  }
+
+  /// Dialog 1: Memilih Kelas
+  void _showPilihKelasDialog() {
+    Get.defaultDialog(
+      title: "Pilih Kelas",
+      content: FutureBuilder<List<String>>(
+        future: controller.getKelasTersedia(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const CircularProgressIndicator();
+          if (snapshot.data!.isEmpty) return const Text("Tidak ada kelas yang tersedia.");
+          return SizedBox(
+            width: Get.width * 0.7,
+            height: Get.height * 0.3,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: snapshot.data!.length,
+              itemBuilder: (context, index) {
+                String namaKelas = snapshot.data![index];
+                return ListTile(
+                  title: Text(namaKelas),
+                  onTap: () {
+                    Get.back(); // Tutup dialog pilih kelas
+                    _showPilihSiswaBottomSheet(namaKelas); // Buka bottom sheet siswa
+                  },
+                );
+              },
+            ),
+          );
         },
       ),
     );
   }
+
+  /// Dialog 2: Memilih Siswa dari Kelas yang Dipilih
+  void _showPilihSiswaBottomSheet(String namaKelas) {
+    Get.bottomSheet(
+      Container(
+        height: Get.height * 0.7,
+        padding: const EdgeInsets.all(16),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(children: [
+          Text("Siswa dari Kelas $namaKelas", style: Get.textTheme.titleLarge),
+          const Divider(),
+          Expanded(child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: controller.getSiswaBaruStream(namaKelas),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                return const Center(child: Text("Semua siswa di kelas ini sudah memiliki kelompok."));
+              }
+              return ListView.builder(
+                itemCount: snapshot.data!.docs.length,
+                itemBuilder: (context, index) {
+                  var dataSiswa = snapshot.data!.docs[index].data();
+                  return ListTile(
+                    title: Text(dataSiswa['namasiswa']),
+                    subtitle: Text("NISN: ${dataSiswa['nisn']}"),
+                    trailing: Obx(() => controller.isDialogLoading.value 
+                      ? const CircularProgressIndicator()
+                      : IconButton(
+                          icon: const Icon(Icons.add_circle, color: Colors.green),
+                          onPressed: () => controller.tambahSiswaKeHalaqoh(dataSiswa),
+                        )),
+                  );
+                },
+              );
+            },
+          )),
+        ]),
+      ),
+      isScrollControlled: true,
+    );
+  }
+}
+
+Color _getAlhusnaColor(String level) {
+  if (level.toLowerCase().contains('al-husna')) {
+    return Colors.green.shade400;
+  }
+  if (level.toLowerCase().contains('juz 30')) {
+    return Colors.blue.shade400;
+  }
+  if (level.toLowerCase().contains('juz 1')) {
+    return Colors.purple.shade400;
+  }
+  if (level.toLowerCase().startsWith('juz')) {
+    return Colors.orange.shade400;
+  }
+  return Colors.grey.shade400;
 }

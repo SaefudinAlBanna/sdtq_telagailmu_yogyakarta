@@ -1,244 +1,131 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 
-class DaftarNilaiController extends GetxController {
-  var dataNilai = Get.arguments;
+// --- MODEL DATA BARU UNTUK MENAMPUNG SETIAP NILAI ---
+class NilaiHalaqoh {
+  final String pengampu;
+  final DateTime tanggalInput;
+  final String sabaq;
+  final String nilaiSabaq;
+  final String sabqi;
+  final String nilaiSabqi;
+  final String manzil;
+  final String nilaiManzil;
+  final String tugasTambahan;
+  final String nilaiTugasTambahan;
+  final String catatanPengampu;
+  final String catatanOrangTua;
 
-  FirebaseAuth auth = FirebaseAuth.instance;
-  FirebaseFirestore firestore = FirebaseFirestore.instance;
+  NilaiHalaqoh({
+    required this.pengampu,
+    required this.tanggalInput,
+    required this.sabaq,
+    required this.nilaiSabaq,
+    required this.sabqi,
+    required this.nilaiSabqi,
+    required this.manzil,
+    required this.nilaiManzil,
+    required this.tugasTambahan,
+    required this.nilaiTugasTambahan,
+    required this.catatanPengampu,
+    required this.catatanOrangTua,
+  });
 
-  String idSekolah = 'P9984539';
-
-  Future<String> getTahunAjaranTerakhir() async {
-    CollectionReference<Map<String, dynamic>> colTahunAjaran = firestore
-        .collection('Sekolah')
-        .doc(idSekolah)
-        .collection('tahunajaran');
-    QuerySnapshot<Map<String, dynamic>> snapshotTahunAjaran =
-        await colTahunAjaran.get();
-    List<Map<String, dynamic>> listTahunAjaran =
-        snapshotTahunAjaran.docs.map((e) => e.data()).toList();
-    String tahunAjaranTerakhir =
-        listTahunAjaran.map((e) => e['namatahunajaran']).toList().last;
-    return tahunAjaranTerakhir;
-  }
-
-  Future<QuerySnapshot<Map<String, dynamic>>> getDataNilai() async {
-    String tahunajaranya = await getTahunAjaranTerakhir();
-    String idTahunAjaran = tahunajaranya.replaceAll("/", "-");
-
-    CollectionReference<Map<String, dynamic>> colSemester = firestore
-        .collection('Sekolah')
-        .doc(idSekolah)
-        .collection('tahunajaran')
-        .doc(idTahunAjaran)
-        .collection('kelompokmengaji')
-        .doc(dataNilai['fase'])
-        .collection('pengampu')
-        .doc(dataNilai['namapengampu'])
-        // .collection('tempat')
-        // .doc(dataNilai['tempatmengaji'])
-        .collection('daftarsiswa')
-        .doc(dataNilai['nisn'])
-        .collection('semester');
-
-    QuerySnapshot<Map<String, dynamic>> snapSemester = await colSemester.get();
-    if (snapSemester.docs.isNotEmpty) {
-      Map<String, dynamic> dataSemester = snapSemester.docs.first.data();
-      String namaSemester = dataSemester['namasemester'];
-
-      // String kelasnya = data.toString();
-      return await firestore
-          .collection('Sekolah')
-          .doc(idSekolah)
-          .collection('tahunajaran')
-          .doc(idTahunAjaran)
-          .collection('kelompokmengaji')
-          .doc(dataNilai['fase'])
-          .collection('pengampu')
-          .doc(dataNilai['namapengampu'])
-          // .collection('tempat')
-          // .doc(dataNilai['tempatmengaji'])
-          .collection('daftarsiswa')
-          .doc(dataNilai['nisn'])
-          .collection('semester')
-          .doc(namaSemester)
-          .collection('nilai')
-          .orderBy('tanggalinput', descending: true)
-          .get();
-    } else {
-      throw Exception('Semester data not found');
-    }
+  // Factory constructor untuk membuat objek dari data Firestore
+  factory NilaiHalaqoh.fromFirestore(Map<String, dynamic> data) {
+    return NilaiHalaqoh(
+      pengampu: data['namapengampu'] ?? '-',
+      tanggalInput: DateTime.parse(data['tanggalinput']),
+      sabaq: data['suratsabaq']?.isNotEmpty == true ? data['suratsabaq'] : data['sabaq'] ?? '-',
+      nilaiSabaq: data['nilaisabaq']?.toString() ?? '-',
+      sabqi: data['suratsabqi']?.isNotEmpty == true ? data['suratsabqi'] : data['sabqi'] ?? '-',
+      nilaiSabqi: data['nilaisabqi']?.toString() ?? '-',
+      manzil: data['suratmanzil']?.isNotEmpty == true ? data['suratmanzil'] : data['manzil'] ?? '-',
+      nilaiManzil: data['nilaimanzil']?.toString() ?? '-',
+      tugasTambahan: data['tugastambahan'] ?? '-',
+      nilaiTugasTambahan: data['nilaitugastambahan']?.toString() ?? '-',
+      catatanPengampu: data['keteranganpengampu'] ?? '-',
+      catatanOrangTua: (data['keteranganorangtua'] != null && data['keteranganorangtua'] != "0") ? data['keteranganorangtua'] : '-',
+    );
   }
 }
 
-// import 'package:cloud_firestore/cloud_firestore.dart';
-// import 'package:get/get.dart';
+class DaftarNilaiController extends GetxController {
+  final FirebaseFirestore firestore = FirebaseFirestore.instance;
+  final String idSekolah = 'P9984539';
+  final Map<String, dynamic> dataSiswa = Get.arguments;
 
-// class DaftarNilaiController extends GetxController {
-//   late Map<String, dynamic> dataSiswaArgs;
-//   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-//   static const String _defaultIdSekolah = '20404148'; // Pertimbangkan untuk membuatnya konfigurasi
+  // State untuk menampung hasil
+  var isLoading = true.obs;
+  var daftarNilai = <NilaiHalaqoh>[].obs;
 
-//   // Getter untuk idSekolah agar lebih bersih
-//   String get idSekolah {
-//     // Pastikan dataSiswaArgs sudah diinisialisasi
-//     if (dataSiswaArgs.containsKey('id_sekolah') && dataSiswaArgs['id_sekolah'] != null) {
-//       return dataSiswaArgs['id_sekolah'] as String;
-//     }
-//     return _defaultIdSekolah;
-//   }
+  @override
+  void onInit() {
+    super.onInit();
+    fetchDataNilai();
+  }
 
-//   // State untuk UI
-//   final RxBool isLoading = true.obs;
-//   final RxString errorMessage = ''.obs;
+  Future<void> fetchDataNilai() async {
+    try {
+      isLoading.value = true;
+      String tahunAjaran = await getTahunAjaranTerakhir();
+      String idTahunAjaran = tahunAjaran.replaceAll("/", "-");
+      
+      String fase = dataSiswa['fase'];
+      String pengampu = dataSiswa['namapengampu'];
+      String nisn = dataSiswa['nisn'];
 
-//   @override
-//   void onInit() {
-//     super.onInit();
-//     final arguments = Get.arguments;
-//     print("DaftarNilaiController - Arguments Diterima: $arguments");
-//     if (arguments is Map<String, dynamic>) {
-//       dataSiswaArgs = arguments;
-//       print("DaftarNilaiController - dataSiswaArgs: $dataSiswaArgs");
-//       print("DaftarNilaiController - ID Sekolah Digunakan: $idSekolah");
-//       // JANGAN panggil streamDataNilai() di sini, biarkan StreamBuilder yang memanggil
-//     } else {
-//       dataSiswaArgs = {};
-//       errorMessage.value = "Data siswa tidak valid untuk menampilkan nilai.";
-//       isLoading.value = false; // Langsung set false karena tidak bisa lanjut
-//       print("DaftarNilaiController - Argumen TIDAK VALID, isLoading: ${isLoading.value}, errorMessage: ${errorMessage.value}");
-//     }
-//   }
+      // Path dasar ke koleksi semester siswa
+      CollectionReference semesterRef = firestore
+          .collection('Sekolah').doc(idSekolah)
+          .collection('tahunajaran').doc(idTahunAjaran)
+          .collection('kelompokmengaji').doc(fase)
+          .collection('pengampu').doc(pengampu)
+          .collection('daftarsiswa').doc(nisn)
+          .collection('semester');
 
-//   // Fungsi helper untuk mendapatkan tahun ajaran terakhir
-//   Future<String> _fetchTahunAjaranTerakhir() async {
-//   print("_fetchTahunAjaranTerakhir: Memulai untuk ID Sekolah: $idSekolah");
-//   try {
-//     QuerySnapshot<Map<String, dynamic>> snapshotTahunAjaran = await _firestore
-//         .collection('Sekolah')
-//         .doc(idSekolah)
-//         .collection('tahunajaran')
-//         .orderBy('timestamp_pembuatan_ta', descending: true)
-//         .limit(1)
-//         .get();
+      // Ambil nama semester pertama yang ditemukan
+      QuerySnapshot semesterSnapshot = await semesterRef.limit(1).get();
+      if (semesterSnapshot.docs.isEmpty) {
+        print("Siswa belum memiliki data semester.");
+        daftarNilai.clear();
+        isLoading.value = false;
+        return;
+      }
+      String idSemester = semesterSnapshot.docs.first.id;
 
-//     if (snapshotTahunAjaran.docs.isNotEmpty) {
-//       final namaTA = snapshotTahunAjaran.docs.first.data()['namatahunajaran'] as String?;
-//       print("_fetchTahunAjaranTerakhir: Sukses - Dokumen ditemukan, namaTA: $namaTA");
-//       if (namaTA != null) return namaTA;
-//     }
-//     print("_fetchTahunAjaranTerakhir: Gagal - Tidak ada dokumen tahun ajaran atau namaTA null.");
-//     throw Exception("Tahun ajaran terakhir tidak ditemukan.");
-//   } catch (e) {
-//     print("_fetchTahunAjaranTerakhir: Error Catch - $e");
-//     throw Exception("Gagal mendapatkan data tahun ajaran: ${e.toString()}");
-//   }
-// }
+      // Ambil semua data nilai dari semester tersebut
+      QuerySnapshot<Map<String, dynamic>> nilaiSnapshot = await semesterRef
+          .doc(idSemester)
+          .collection('nilai')
+          .orderBy('tanggalinput', descending: true)
+          .get();
+      
+      // Ubah data Firestore menjadi daftar objek NilaiHalaqoh
+      daftarNilai.value = nilaiSnapshot.docs.map((doc) => NilaiHalaqoh.fromFirestore(doc.data())).toList();
 
-//   // Fungsi helper untuk mendapatkan nama semester siswa
-//   Future<String> _fetchNamaSemesterSiswa(String idTahunAjaranFormatted) async {
-//   print("_fetchNamaSemesterSiswa: Memulai untuk TA Formatted: $idTahunAjaranFormatted");
-//   print("_fetchNamaSemesterSiswa - Menggunakan dataSiswaArgs: $dataSiswaArgs");
-//   if (dataSiswaArgs.isEmpty) {
-//     print("_fetchNamaSemesterSiswa: Error - dataSiswaArgs tidak lengkap.");
-//     throw Exception("Data siswa tidak lengkap untuk mengambil semester.");
-//   }
-//   try {
-//     // ... (query Firestore seperti sebelumnya) ...
-//     QuerySnapshot<Map<String, dynamic>> snapSemester = await _firestore
-//         .collection('Sekolah').doc(idSekolah)
-//         .collection('tahunajaran').doc(idTahunAjaranFormatted)
-//         .collection('kelompokmengaji').doc(dataSiswaArgs['fase'] as String)
-//         .collection('pengampu').doc(dataSiswaArgs['namapengampu'] as String)
-//         .collection('tempat').doc(dataSiswaArgs['tempatmengaji'] as String)
-//         .collection('daftarsiswa').doc(dataSiswaArgs['nisn'] as String)
-//         .collection('semester')
-//         .orderBy('tanggalinput', descending: true) // PERIKSA FIELD INI!
-//         .limit(1)
-//         .get();
+    } catch (e, s) {
+      print("Error fetching nilai: $e");
+      print(s);
+      Get.snackbar("Error", "Gagal memuat data nilai: $e");
+    } finally {
+      isLoading.value = false;
+    }
+  }
 
-//     if (snapSemester.docs.isNotEmpty) {
-//       final namaSemester = snapSemester.docs.first.data()['namasemester'] as String?;
-//       print("_fetchNamaSemesterSiswa: Sukses - Dokumen ditemukan, namaSemester: $namaSemester");
-//       if (namaSemester != null) return namaSemester;
-//     }
-//     print("_fetchNamaSemesterSiswa: Gagal - Tidak ada dokumen semester atau namaSemester null.");
-//     throw Exception("Semester siswa tidak ditemukan.");
-//   } catch (e) {
-//     print("_fetchNamaSemesterSiswa: Error Catch - $e");
-//     throw Exception("Gagal mendapatkan data semester siswa: ${e.toString()}");
-//   }
-// }
+  Future<String> getTahunAjaranTerakhir() async {
+    QuerySnapshot<Map<String, dynamic>> snapshot = await firestore
+        .collection('Sekolah').doc(idSekolah)
+        .collection('tahunajaran')
+        .orderBy('namatahunajaran', descending: true)
+        .limit(1).get();
+    if (snapshot.docs.isEmpty) throw Exception("Tidak ada data tahun ajaran");
+    return snapshot.docs.first.data()['namatahunajaran'] as String;
+  }
 
-//   // Fungsi utama untuk mendapatkan stream nilai
-//    Stream<QuerySnapshot<Map<String, dynamic>>> streamDataNilai() async* {
-//     // Set isLoading true DI AWAL FUNGSI STREAM INI
-//     // Ini akan ditangkap oleh Obx jika StreamBuilder belum sempat menampilkan loadingnya sendiri
-//     isLoading.value = true;
-//     errorMessage.value = '';
-//     print("DaftarNilaiController - streamDataNilai: Memulai. isLoading: ${isLoading.value}");
-
-//     if (dataSiswaArgs.isEmpty || dataSiswaArgs['fase'] == null) {
-//       final String errorMsg = "Informasi siswa tidak lengkap untuk memuat nilai.";
-//       errorMessage.value = errorMsg;
-//       isLoading.value = false; // Penting di jalur error
-//       print("DaftarNilaiController - streamDataNilai: Error awal - dataSiswaArgs tidak valid. isLoading: ${isLoading.value}, error: ${errorMessage.value}");
-//       yield* Stream.error(Exception(errorMsg));
-//       return;
-//     }
-
-//     try {
-//       print("DaftarNilaiController - streamDataNilai: Akan memanggil _fetchTahunAjaranTerakhir");
-//       final String tahunAjaran = await _fetchTahunAjaranTerakhir();
-//       print("DaftarNilaiController - streamDataNilai: Hasil _fetchTahunAjaranTerakhir: $tahunAjaran");
-//       final String idTahunAjaranFormatted = tahunAjaran.replaceAll("/", "-");
-
-//       print("DaftarNilaiController - streamDataNilai: Akan memanggil _fetchNamaSemesterSiswa dengan TA: $idTahunAjaranFormatted");
-//       final String namaSemester = await _fetchNamaSemesterSiswa(idTahunAjaranFormatted);
-//       print("DaftarNilaiController - streamDataNilai: Hasil _fetchNamaSemesterSiswa: $namaSemester");
-
-//       print("DaftarNilaiController - streamDataNilai: Akan yield stream Firestore. isLoading saat ini (sebelum map): ${isLoading.value}");
-//       // isLoading akan di-set false oleh .map() di bawah saat data pertama datang.
-//       // Jika ada error sebelum itu, catch utama akan set isLoading = false.
-
-//       yield* _firestore
-//           // ... (path query Anda)
-//           .collection('Sekolah').doc(idSekolah)
-//           .collection('tahunajaran').doc(idTahunAjaranFormatted)
-//           .collection('kelompokmengaji').doc(dataSiswaArgs['fase'] as String)
-//           .collection('pengampu').doc(dataSiswaArgs['namapengampu'] as String)
-//           .collection('tempat').doc(dataSiswaArgs['tempatmengaji'] as String)
-//           .collection('daftarsiswa').doc(dataSiswaArgs['nisn'] as String)
-//           .collection('semester').doc(namaSemester)
-//           .collection('nilai')
-//           .orderBy('tanggalinput', descending: true)
-//           .snapshots()
-//           .map((snapshot) {
-//               if (isLoading.value) { // Hanya set sekali
-//                   print("DaftarNilaiController - streamDataNilai (map): Data pertama dari Firestore, isLoading -> false. Jumlah Dokumen: ${snapshot.docs.length}");
-//                   isLoading.value = false;
-//               } else {
-//                   print("DaftarNilaiController - streamDataNilai (map): Update data dari Firestore. Jumlah Dokumen: ${snapshot.docs.length}");
-//               }
-//               return snapshot;
-//             })
-//           .handleError((error, stackTrace){
-//               print("DaftarNilaiController - streamDataNilai (handleError Firestore): Error: $error. isLoading -> false");
-//               isLoading.value = false; // Pastikan di-set false
-//               errorMessage.value = "Gagal memuat daftar nilai: ${error.toString()}";
-//               throw Exception(errorMessage.value); // Rethrow agar StreamBuilder menangkapnya
-//             });
-
-//     } catch (e) {
-//       print("DaftarNilaiController - streamDataNilai (catch utama): Error: $e. isLoading -> false");
-//       isLoading.value = false; // Pastikan di-set false
-//       errorMessage.value = e.toString().replaceFirst("Exception: ", "");
-//       yield* Stream.error(Exception(errorMessage.value));
-//     }
-//     // Tidak perlu set isLoading false di sini jika stream berhasil, .map akan menanganinya.
-//     // Jika stream selesai (tidak ada lagi data atau error), isLoading akan tetap false.
-//   }
-
-// }
+  String formatTanggal(DateTime date) {
+    return DateFormat('EEEE, d MMMM y', 'id_ID').format(date);
+  }
+}

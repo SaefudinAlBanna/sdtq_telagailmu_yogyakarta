@@ -25,8 +25,9 @@ class JurnalAjarHarianView extends GetView<JurnalAjarHarianController> {
         foregroundColor: theme.colorScheme.onPrimary,
         elevation: 2,
       ),
-      body: Expanded(
+      body: SafeArea(
         child: SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 100),
           child: Column(
             // padding: const EdgeInsets.all(16.0),
             children: [
@@ -130,13 +131,13 @@ class JurnalAjarHarianView extends GetView<JurnalAjarHarianController> {
                 },
                 borderRadius: BorderRadius.circular(10),
                 child: Padding(
-                  padding: const EdgeInsets.all(8.0), // Padding di dalam card
+                  padding: const EdgeInsets.all(5.0), // Padding di dalam card
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Icon(Icons.access_time_filled_rounded, size: 28, color: theme.colorScheme.primary),
-                      const SizedBox(height: 8),
+                      Icon(Icons.access_time_filled_rounded, size: 25, color: theme.colorScheme.primary),
+                      const SizedBox(height: 5),
                       Text(
                         jamPelajaran,
                         style: theme.textTheme.titleSmall?.copyWith(
@@ -385,7 +386,7 @@ class JurnalAjarHarianView extends GetView<JurnalAjarHarianController> {
             Map<String, dynamic> data = snapshotTampil.data!.docs[index].data();
             Timestamp? ts = data['tanggalinput'] is Timestamp ? data['tanggalinput'] as Timestamp : null;
             DateTime tanggalInput = ts?.toDate() ?? DateTime.now();
-
+        
             return Card(
               elevation: 1.5,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -440,325 +441,4 @@ class JurnalAjarHarianView extends GetView<JurnalAjarHarianController> {
   }
 }
 
-// ====================== KODE LAMA ====================
-
-// import 'package:cloud_firestore/cloud_firestore.dart';
-// import 'package:dropdown_search/dropdown_search.dart';
-// import 'package:flutter/material.dart';
-
-// import 'package:get/get.dart';
-
-// import '../controllers/jurnal_ajar_harian_controller.dart';
-
-// class JurnalAjarHarianView extends GetView<JurnalAjarHarianController> {
-//   JurnalAjarHarianView({super.key});
-
-//   final dataArgument = Get.arguments;
-
-//   @override
-//   Widget build(BuildContext context) {
-//     // print("dataArgument = $dataArgument");
-//     return Scaffold(
-//       appBar: AppBar(
-//         // title: const Text('JurnalAjarHarianView'),
-//         centerTitle: true,
-//       ),
-//       body: ListView(
-//         children: [
-//           Column(
-//             children: [
-//               FutureBuilder<QuerySnapshot<Map<String, dynamic>>>(
-//                 future: controller.tampilkanJamPelajaran(),
-//                 builder: (context, snapPilihJurnal) {
-//                   return ListView.builder(
-//                     physics: NeverScrollableScrollPhysics(),
-//                     shrinkWrap: true,
-//                     itemCount: snapPilihJurnal.data?.docs.length ?? 0,
-//                     itemBuilder: (context, index) {
-//                       if (snapPilihJurnal.connectionState ==
-//                           ConnectionState.waiting) {
-//                         return Center(child: CircularProgressIndicator());
-//                       }
-//                       if (snapPilihJurnal.hasData) {
-//                         var data = snapPilihJurnal.data!.docs[index].data();
-//                         // return ListTile(
-//                         //   onTap: () {
-//                         //     print("yang ke ${index + 1}");
-//                         //   },
-//                         //   title: Text(data['namamatapelajaran']),
-//                         //   subtitle: Text(dataKelas),
-//                         // );
-
-//                         return Padding(
-//                           padding: const EdgeInsets.only(top: 10),
-//                           child: Material(
-//                             color: Colors.grey[200],
-//                             borderRadius: BorderRadius.circular(15),
-//                             child: InkWell(
-//                               onTap: () {
-//                                 print(
-//                                   "data['jampelajaran'] = ${data['jampelajaran']}",
-//                                 );
-//                                 Get.bottomSheet(
-//                                   Container(
-//                                     height: 400,
-//                                     color: Colors.white,
-//                                     child: Padding(
-//                                       padding: const EdgeInsets.symmetric(
-//                                         vertical: 10,
-//                                         horizontal: 10,
-//                                       ),
-//                                       child: Column(
-//                                         children: [
-//                                           Container(
-//                                             height: 50,
-//                                             decoration: BoxDecoration(
-//                                               color: Colors.grey[50],
-//                                               borderRadius:
-//                                                   BorderRadius.circular(10),
-//                                             ),
-//                                             child: Text(
-//                                               data['jampelajaran'],
-//                                               style: TextStyle(
-//                                                 fontWeight: FontWeight.bold,
-//                                               ),
-//                                             ),
-//                                           ),
-
-//                                           DropdownSearch<String>(
-//                                             decoratorProps:
-//                                                 DropDownDecoratorProps(
-//                                                   decoration: InputDecoration(
-//                                                     border:
-//                                                         OutlineInputBorder(),
-//                                                     filled: true,
-//                                                     prefixText: 'kelas : ',
-//                                                   ),
-//                                                 ),
-//                                             selectedItem:
-//                                                 controller.kelasSiswaC.text,
-//                                             items:
-//                                                 (f, cs) =>
-//                                                     controller.getDataKelas(),
-//                                             onChanged: (String? value) {
-//                                               controller.kelasSiswaC.text =
-//                                                   value!;
-//                                             },
-//                                             popupProps: PopupProps.menu(
-//                                               // disabledItemFn: (item) => item == '1A',
-//                                               fit: FlexFit.tight,
-//                                             ),
-//                                           ),
-//                                           SizedBox(height: 15),
-
-//                                           DropdownSearch<String>(
-//                                             decoratorProps:
-//                                                 DropDownDecoratorProps(
-//                                                   decoration: InputDecoration(
-//                                                     border:
-//                                                         OutlineInputBorder(),
-//                                                     filled: true,
-//                                                     prefixText: 'mapel : ',
-//                                                   ),
-//                                                 ),
-//                                             selectedItem:
-//                                                 controller.mapelC.text,
-//                                             items:
-//                                                 (f, cs) =>
-//                                                     controller.getDataMapel(),
-//                                             onChanged: (String? value) {
-//                                               controller.mapelC.text = value!;
-//                                             },
-//                                             popupProps: PopupProps.menu(
-//                                               // disabledItemFn: (item) => item == '1A',
-//                                               fit: FlexFit.tight,
-//                                             ),
-//                                           ),
-//                                           SizedBox(height: 15),
-
-//                                           TextField(
-//                                             controller: controller.materimapelC,
-//                                             decoration: InputDecoration(
-//                                               labelText: 'Materi Pelajaran',
-//                                               labelStyle: TextStyle(
-//                                                 fontSize: 12,
-//                                               ),
-//                                               border: OutlineInputBorder(),
-//                                               enabledBorder: OutlineInputBorder(
-//                                                 borderSide: BorderSide(
-//                                                   color: Colors.grey,
-//                                                 ),
-//                                               ),
-//                                             ),
-//                                           ),
-//                                           SizedBox(height: 15),
-
-//                                           TextField(
-//                                             controller:
-//                                                 controller.catatanjurnalC,
-//                                             decoration: InputDecoration(
-//                                               labelText: 'Catatan',
-//                                               labelStyle: TextStyle(
-//                                                 fontSize: 12,
-//                                               ),
-//                                               border: OutlineInputBorder(),
-//                                               enabledBorder: OutlineInputBorder(
-//                                                 borderSide: BorderSide(
-//                                                   color: Colors.grey,
-//                                                 ),
-//                                               ),
-//                                             ),
-//                                           ),
-//                                           SizedBox(height: 15),
-
-//                                           ElevatedButton(
-//                                             onPressed: () {
-//                                               // ignore: unnecessary_null_comparison
-//                                               if (controller.kelasSiswaC.text ==
-//                                                       null ||
-//                                                   controller
-//                                                       .kelasSiswaC
-//                                                       .text
-//                                                       .isEmpty) {
-//                                                 Get.snackbar(
-//                                                   "Error",
-//                                                   "Kelas masih kosong",
-//                                                 );
-//                                               } else if (controller
-//                                                           .mapelC
-//                                                           // ignore: unnecessary_null_comparison
-//                                                           .text ==
-//                                                       null ||
-//                                                   controller
-//                                                       .mapelC
-//                                                       .text
-//                                                       .isEmpty) {
-//                                                 Get.snackbar(
-//                                                   "Error",
-//                                                   "Mapel masih kosong",
-//                                                 );
-//                                               } else if (controller
-//                                                           .materimapelC
-//                                                           // ignore: unnecessary_null_comparison
-//                                                           .text ==
-//                                                       null ||
-//                                                   controller
-//                                                       .materimapelC
-//                                                       .text
-//                                                       .isEmpty) {
-//                                                 Get.snackbar(
-//                                                   "Error",
-//                                                   "Materi Mapel masih kosong",
-//                                                 );
-//                                               } else {
-//                                                 controller.simpanDataJurnal(
-//                                                   data['jampelajaran'],
-//                                                 );
-//                                               }
-//                                             },
-//                                             child: Text("Simpan"),
-//                                           ),
-//                                         ],
-//                                       ),
-//                                     ),
-//                                   ),
-//                                 );
-//                               },
-//                               child: Container(
-//                                 margin: EdgeInsets.fromLTRB(20, 10, 10, 0),
-//                                 decoration: BoxDecoration(
-//                                   borderRadius: BorderRadius.circular(15),
-//                                 ),
-//                                 child: Text(data['jampelajaran']),
-//                               ),
-//                             ),
-//                           ),
-//                         );
-//                       }
-//                       // Add a default return for other cases
-//                       return Text(
-//                         "Tidak bisa memuat data, silahkan ulangi lagi",
-//                       );
-//                     },
-//                   );
-//                 },
-//               ),
-//               SizedBox(height: 3),
-//               Divider(height: 3),
-//               // Container(height: 2, color: Colors.grey),
-
-//               // ElevatedButton(onPressed: ()=>controller.refreshTampilan(), child: Text("test")),
-//               StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-//                 stream: controller.tampilkanjurnal(),
-//                 // stream: null,
-//                 builder: (context, snapshotTampil) {
-//                   if (snapshotTampil.connectionState ==
-//                       ConnectionState.waiting) {
-//                     return Center(child: CircularProgressIndicator());
-//                   }
-//                   // ignore: prefer_is_empty
-//                   if (snapshotTampil.data == null ||
-//                       snapshotTampil.data?.docs.length == 0) {
-//                     return Center(child: Text('belum ada data'));
-//                   }
-//                   if (snapshotTampil.hasData) {
-//                     return ListView.builder(
-//                       shrinkWrap: true,
-//                       itemCount: snapshotTampil.data!.docs.length,
-//                       itemBuilder: (context, index) {
-//                         Map<String, dynamic> data =
-//                             snapshotTampil.data!.docs[index].data() as Map<String, dynamic>;
-
-//                         // Format tanggal Jurnal
-//                         String formattedTglJurnal = '';
-//                         if (data['tanggalinput'] != null) {
-//                           // ignore: non_constant_identifier_names
-//                           DateTime? TglJurnal;
-//                           if (data['tanggalinput'] is Timestamp) {
-//                             TglJurnal =
-//                                 (data['tanggalinput'] as Timestamp).toDate();
-//                           } else if (data['tanggalinput'] is String) {
-//                             TglJurnal = DateTime.tryParse(data['tanggalinput']);
-//                           }
-//                           if (TglJurnal != null) {
-//                             formattedTglJurnal =
-//                                 "${TglJurnal.day.toString().padLeft(2, '0')}-${TglJurnal.month.toString().padLeft(2, '0')}-${TglJurnal.year}";
-//                           }
-//                         }
-
-//                         // return ListTile(
-//                         //   title: Text(data['namamapel']),
-//                         //   subtitle: Text(data['jampelajaran']),
-//                         // );
-//                         return Container(
-//                           margin: EdgeInsets.fromLTRB(20, 10, 10, 0),
-//                           decoration: BoxDecoration(
-//                             borderRadius: BorderRadius.circular(15),
-//                           ),
-//                           child: Column(
-//                             crossAxisAlignment: CrossAxisAlignment.start,
-//                             children: [
-//                               // Text("Tanggal Jurnal : ${data['uidtanggal']}"),
-//                               Text("Tanggal : $formattedTglJurnal"),
-//                               Text("Jam Pelajaran : ${data['jampelajaran']}"),
-//                               Text("Mapel : ${data['namamapel']}"),
-//                               Text("Materi : ${data['materipelajaran']}"),
-//                               Text("Catatan : ${data['catatanjurnal']}"),
-//                             ],
-//                           ),
-//                         );
-//                       },
-//                     );
-//                   }
-//                   // Default return to satisfy non-nullable return type
-//                   return SizedBox.shrink();
-//                 },
-//               ),
-//             ],
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
 
