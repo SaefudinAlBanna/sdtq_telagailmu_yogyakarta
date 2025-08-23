@@ -1,25 +1,24 @@
 // lib/app/models/jurnal_model.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class JurnalModel {
-  final String? materipelajaran;
-  final String? namapenginput;
+  final String id;
+  final String materi;
+  final String catatan;
   final String? jampelajaran;
-  final String? catatanjurnal; // <-- TAMBAHAN BARU
-
+  // ... tambahkan field lain jika diperlukan nanti
+  
   JurnalModel({
-    this.materipelajaran,
-    this.namapenginput,
-    this.jampelajaran,
-    this.catatanjurnal, // <-- TAMBAHAN BARU
-  });
+    required this.id, required this.materi, 
+    required this.catatan, this.jampelajaran});
 
-  factory JurnalModel.fromFirestore(Map<String, dynamic> data) {
+  factory JurnalModel.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data() ?? {};
     return JurnalModel(
-      materipelajaran: data['materipelajaran'] as String?,
-      namapenginput: data['namapenginput'] as String?,
-      jampelajaran: data['jampelajaran'] as String?,
-      // Ambil data 'catatanjurnal' dari Firestore
-      catatanjurnal: data['catatanjurnal'] as String?, // <-- TAMBAHAN BARU
+      id: doc.id,
+      materi: data['materi'] ?? '',
+      catatan: data['catatan'] ?? '',
+      jampelajaran: data['jam'] as String?,
     );
   }
 }

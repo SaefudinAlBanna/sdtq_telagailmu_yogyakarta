@@ -10,12 +10,12 @@ class DetailSiswaView extends GetView<DetailSiswaController> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('DetailSiswaView'),
+        title: const Text('Detail Siswa'),
         centerTitle: true,
       ),
       body: const Center(
         child: Text(
-          'DetailSiswaView is working',
+          'Detail Siswa Akan Ditampilkan Disini',
           style: TextStyle(fontSize: 20),
         ),
       ),

@@ -1,176 +1,708 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+// lib/app/modules/input_nilai_siswa/views/input_nilai_siswa_view.dart (LOGIKA EKSKLUSIF DITERAPKAN)
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
+import 'package:sdtq_telagailmu_yogyakarta/app/models/atp_model.dart';
+import 'package:sdtq_telagailmu_yogyakarta/app/models/nilai_harian_model.dart';
 import '../controllers/input_nilai_siswa_controller.dart';
 
-// GANTI DARI GetView MENJADI StatelessWidget
-class InputNilaiSiswaView extends StatelessWidget {
-  const InputNilaiSiswaView({super.key});
+class InputNilaiSiswaView extends GetView<InputNilaiSiswaController> {
+  const InputNilaiSiswaView({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    // KITA CARI CONTROLLER SECARA MANUAL DENGAN TAG YANG BENAR
-    // 1. Ambil argumen untuk mendapatkan tag-nya
-    final Map<String, dynamic> args = Get.arguments as Map<String, dynamic>;
-    final String uniqueTag = args['idSiswa'] + args['idMapel'];
+    final RxString selectedKategori = "Harian/PR".obs;
 
-    // 2. Gunakan Get.find() dengan tag yang sudah kita buat
-    final InputNilaiSiswaController controller = Get.find<InputNilaiSiswaController>(tag: uniqueTag);
-
-    // Dari sini ke bawah, semua kode sama seperti sebelumnya,
-    // karena kita sudah punya variabel 'controller'.
     return Scaffold(
       appBar: AppBar(
-        title: Text(controller.args['namaSiswa']),
-        centerTitle: true,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(20.0),
-          child: Text(
-            controller.args['idMapel'],
-            style: const TextStyle(color: Colors.white, fontSize: 16),
-          ),
+        title: Column(
+          children: [
+            Text(controller.namaMapel, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(controller.siswa.namaLengkap, style: const TextStyle(fontSize: 14)),
+          ],
         ),
+        centerTitle: true,
+        actions: [
+          Obx(() {
+            return controller.isSaving.value
+              ? const Padding(padding: EdgeInsets.all(16.0), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white)))
+              : TextButton(
+                  onPressed: controller.simpanSemuaCapaian,
+                  child: Text("SIMPAN", style: TextStyle(color: Colors.indigo.shade800, fontWeight: FontWeight.bold)),
+                );
+          }),
+        ],
       ),
       body: Obx(() {
-        if (!controller.isReady.value) {
-          return const Center(child: CircularProgressIndicator());
-        } else {
-          return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: controller.getDaftarNilai(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                return const Center(child: Text("Belum ada nilai yang diinput."));
-              }
-              return ListView.builder(
-                itemCount: snapshot.data!.docs.length,
-                padding: const EdgeInsets.all(15),
-                itemBuilder: (context, index) {
-                  var dataNilai = snapshot.data!.docs[index].data();
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 15),
-                    elevation: 3,
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: dataNilai['jenisNilai'] == 'Sumatif' ? Colors.blue[300] : Colors.green[300],
-                        child: Text(dataNilai['nilai'].toString()),
-                      ),
-                      title: Text(dataNilai['namaPenilaian']),
-                      subtitle: Text(dataNilai['deskripsi'] ?? 'Tidak ada deskripsi.'),
-                    ),
-                  );
-                },
-              );
-            },
-          );
-        }
-      }),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _showInputNilaiSheet(context, controller);
-        },
-        child: const Icon(Icons.add),
-      ),
-    );
-  }
-
-  void _showInputNilaiSheet(BuildContext context, InputNilaiSiswaController controller) {
-    Get.bottomSheet(
-      FormInputNilaiSheet(controller: controller),
-      isScrollControlled: true,
-    );
-  }
-}
-
-// Widget FormInputNilaiSheet tidak perlu diubah sama sekali
-class FormInputNilaiSheet extends StatelessWidget {
-  final InputNilaiSiswaController controller;
-  const FormInputNilaiSheet({super.key, required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    // 6. Di dalam build method ini, 'controller' merujuk ke properti class di atas.
-    //    Ini adalah variabel yang sama dengan yang kita lewatkan dari halaman utama.
-    //    Jadi, semua pemanggilan seperti `controller.namaPenilaianC` atau `controller.addNilai()`
-    //    dijamin merujuk ke controller yang benar.
-    return Container(
-      // Padding bawah ditambahkan agar form tidak tertutup keyboard.
-      padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(context).viewInsets.bottom + 20),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+        if (controller.isLoading.value) return const Center(child: CircularProgressIndicator());
+        return ListView(
+          padding: const EdgeInsets.all(16),
           children: [
-            const Text("Tambah Nilai Baru", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
+            _buildNilaiAkhirCard(),
+            const SizedBox(height: 24),
+            Text("Penilaian Sumatif", style: Get.textTheme.titleLarge),
+            const SizedBox(height: 8),
+            _buildKategoriSelector(selectedKategori),
+            const SizedBox(height: 16),
+            Obx(() => _buildKontenNilai(selectedKategori.value)),
+            const Divider(height: 48, thickness: 1),
             
-            Obx(() => DropdownButtonFormField<String>(
-              value: controller.jenisNilai.value,
-              items: ["Sumatif", "Formatif"].map((String value) {
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value),
-                );
-              }).toList(),
-              onChanged: (newValue) {
-                if (newValue != null) {
-                  controller.jenisNilai.value = newValue;
-                }
-              },
-              decoration: const InputDecoration(
-                labelText: "Jenis Penilaian",
-                border: OutlineInputBorder(),
-              ),
-            )),
-            const SizedBox(height: 15),
+            // --- Widget yang logikanya DIPERBAIKI SESUAI INSTRUKSI ---
+            _buildKurikulumMerdekaSection(),
 
-            TextField(
-              controller: controller.namaPenilaianC,
-              decoration: const InputDecoration(
-                labelText: "Nama Penilaian (cth: Sumatif Bab 1)",
-                border: OutlineInputBorder(),
-              ),
+            Obx(() {
+              if (controller.isWaliKelas.value) {
+                return _buildRekapWaliKelas();
+              }
+              return const SizedBox.shrink();
+            }),
+          ],
+        );
+      }),
+    );
+  }
+
+  // --- [PERBAIKAN FINAL DI SINI] ---
+  // Logika kini ketat: jika ATP ada, hanya tampilkan daftar TP. Jika tidak, hanya tampilkan deskripsi manual.
+  Widget _buildKurikulumMerdekaSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("Capaian Pembelajaran", style: Get.textTheme.titleLarge),
+        const SizedBox(height: 8),
+        Obx(() {
+          // JIKA ATP TIDAK DITEMUKAN (null)
+          if (controller.atpModel.value == null) {
+            // Maka, tampilkan HANYA card deskripsi manual (KOTAK MERAH).
+            return _buildDeskripsiManualCard();
+          } 
+          // JIKA ATP DITEMUKAN
+          else {
+            // Maka, tampilkan HANYA daftar TP (KOTAK BIRU).
+            return _buildTPList(controller.atpModel.value!);
+          }
+        }),
+      ],
+    );
+  }
+
+  // Widget ini tidak diubah.
+  Widget _buildTPList(AtpModel atp) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text("Pilih capaian siswa berdasarkan Tujuan Pembelajaran (TP) yang ada.", style: TextStyle(color: Colors.grey)),
+        const SizedBox(height: 12),
+        ...atp.unitPembelajaran.map((unit) => Card(
+          margin: const EdgeInsets.only(bottom: 16),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(unit.lingkupMateri, style: Get.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                const Divider(height: 16),
+                ...unit.tujuanPembelajaran.map((tp) => _buildTPItem(tp)).toList(),
+              ],
             ),
-            const SizedBox(height: 15),
-            TextField(
-              controller: controller.nilaiC,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: "Nilai (Angka)",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 15),
-            TextField(
-              controller: controller.deskripsiC,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: "Deskripsi/Catatan (Opsional)",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  controller.addNilai();
-                },
-                child: const Text("Simpan Nilai"),
-              ),
-            ),
+          ),
+        )).toList(),
+      ],
+    );
+  }
+  
+  // Widget ini tidak diubah.
+  Widget _buildTPItem(String tp) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: Text("• $tp", style: const TextStyle(height: 1.4))),
+          const SizedBox(width: 8),
+          Obx(() {
+            final status = controller.capaianTpSiswa[tp];
+            return ToggleButtons(
+              borderRadius: BorderRadius.circular(8),
+              constraints: const BoxConstraints(minHeight: 32.0),
+              isSelected: [status == 'Tercapai', status == 'Perlu Bimbingan'],
+              onPressed: (index) {
+                controller.setCapaianTp(tp, index == 0 ? 'Tercapai' : 'Perlu Bimbingan');
+              },
+              children: const [
+                Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text("T")),
+                Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text("PB")),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+  
+  // Widget ini disederhanakan, parameter 'isAtpAvailable' tidak lagi dibutuhkan.
+  Widget _buildDeskripsiManualCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text("Deskripsi Manual", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            const Text("Karena ATP belum diatur untuk mapel ini, isi deskripsi capaian siswa secara manual.", style: TextStyle(color: Colors.grey, fontSize: 12)),
+            const SizedBox(height: 16),
+            TextField(controller: controller.deskripsiCapaianC, maxLines: 4, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: "Deskripsi Capaian Siswa")),
           ],
         ),
       ),
     );
   }
+
+  // --- Sisa widget di bawah ini tidak ada perubahan ---
+  
+  Widget _buildRekapWaliKelas() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Divider(height: 32),
+          Text("Rekap Nilai Siswa (Akses Wali Kelas)", style: Get.textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Obx(() {
+            if (controller.rekapNilaiMapelLain.isEmpty) {
+              return const Card(child: Padding(padding: EdgeInsets.all(16), child: Text("Belum ada nilai dari mapel lain.")));
+            }
+            return Card(
+              child: Column(
+                children: controller.rekapNilaiMapelLain.map((rekap) => ListTile(
+                  title: Text(rekap['mapel']),
+                  subtitle: Text("Guru: ${rekap['guru']}"),
+                  trailing: Text(
+                    (rekap['nilai_akhir'] as double).toStringAsFixed(1),
+                    style: Get.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                )).toList(),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNilaiAkhirCard() {
+    return Card(
+      elevation: 4,
+      color: Get.theme.primaryColor,
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          children: [
+            const Text("NILAI AKHIR RAPOR", style: TextStyle(color: Colors.white70, fontSize: 14)),
+            const SizedBox(height: 8),
+            Obx(() => Text(
+              controller.nilaiAkhir.value?.toStringAsFixed(1) ?? '-',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 42),
+            )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildKategoriSelector(RxString selectedKategori) {
+    final kategori = ["Harian/PR", "Ulangan Harian", "PTS", "PAS", "Nilai Tambahan"];
+    return SizedBox(
+      height: 40,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: kategori.map((item) => Padding(
+          padding: const EdgeInsets.only(right: 8.0),
+          child: Obx(() => ChoiceChip(
+            label: Text(item),
+            selectedColor: Get.theme.primaryColor.withOpacity(0.8),
+            labelStyle: TextStyle(color: selectedKategori.value == item ? Colors.white : Colors.black),
+            selected: selectedKategori.value == item,
+            onSelected: (selected) { if (selected) selectedKategori.value = item; },
+          )),
+        )).toList(),
+      ),
+    );
+  }
+
+  Widget _buildKontenNilai(String kategori) {
+    switch (kategori) {
+      case "PTS":
+        return _buildNilaiUtamaCard("Penilaian Tengah Semester", controller.nilaiPTS, 'nilai_pts');
+      case "PAS":
+        return _buildNilaiUtamaCard("Penilaian Akhir Semester", controller.nilaiPAS, 'nilai_pas');
+      default:
+        return _buildNilaiHarianList(kategori);
+    }
+  }
+
+  Widget _buildNilaiUtamaCard(String title, Rxn<int> nilaiState, String fieldName) {
+    return Card(
+      child: ListTile(
+        title: Text(title),
+        trailing: Obx(() => Text(
+          nilaiState.value?.toString() ?? "Belum Diisi",
+          style: Get.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: nilaiState.value == null ? Colors.grey : null),
+        )),
+        onTap: () => _showInputDialog(
+          title: "Input $title",
+          initialValue: nilaiState.value?.toString() ?? '',
+          onSave: (nilai) => controller.simpanNilaiUtama(fieldName, nilai),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNilaiHarianList(String kategori) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Obx(() {
+          final listNilai = controller.daftarNilaiHarian.where((n) {
+            if (kategori == "Harian/PR") return n.kategori == "Harian/PR" || n.kategori == "PR";
+            return n.kategori == kategori;
+          }).toList();
+
+          if (listNilai.isEmpty) return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 32.0),
+            child: Center(child: Text("Belum ada nilai untuk kategori ini.", style: TextStyle(color: Colors.grey.shade600))),
+          );
+          
+          return Column(
+            children: listNilai.map((nilai) => Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: CircleAvatar(child: Text(nilai.nilai.toString())),
+                title: Text(nilai.catatan.isNotEmpty ? nilai.catatan : "Nilai ${nilai.kategori}"),
+                subtitle: Text(DateFormat('dd MMM yyyy, HH:mm').format(nilai.tanggal)),
+                trailing: PopupMenuButton<String>(
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      _showInputDialog(
+                        title: "Edit Nilai ${nilai.kategori}", showCatatan: true,
+                        initialValue: nilai.nilai.toString(), initialCatatan: nilai.catatan,
+                        onSave: (_) => controller.updateNilaiHarian(nilai.id),
+                      );
+                    } else if (value == 'hapus') {
+                      controller.deleteNilaiHarian(nilai.id);
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit_outlined), title: Text('Edit'))),
+                    const PopupMenuItem(value: 'hapus', child: ListTile(leading: Icon(Icons.delete_outline), title: Text('Hapus', style: TextStyle(color: Colors.red)))),
+                  ],
+                ),
+              ),
+            )).toList(),
+          );
+        }),
+        const SizedBox(height: 16),
+        ElevatedButton.icon(
+          icon: const Icon(Icons.add),
+          label: Text("Tambah Nilai $kategori"),
+          onPressed: () => _showInputDialog(
+            title: "Tambah Nilai $kategori",
+            showCatatan: true,
+            onSave: (_) => controller.simpanNilaiHarian(kategori),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showInputDialog({
+    required String title, String initialValue = '', String initialCatatan = '',
+    bool showCatatan = false, required Function(int) onSave,
+    }) {
+    controller.nilaiC.text = initialValue;
+    controller.catatanC.text = initialCatatan;
+    Get.defaultDialog(
+      title: title,
+      content: Column(
+        children: [
+          TextField(controller: controller.nilaiC, decoration: const InputDecoration(labelText: 'Nilai (0-100)'), keyboardType: TextInputType.number),
+          if (showCatatan) TextField(controller: controller.catatanC, decoration: const InputDecoration(labelText: 'Catatan (Opsional)')),
+        ],
+      ),
+      confirm: Obx(() => ElevatedButton(
+        onPressed: controller.isSaving.value ? null : () {
+          int? nilai = int.tryParse(controller.nilaiC.text);
+          if (nilai != null && nilai >= 0 && nilai <= 100) {
+            onSave(nilai);
+          } else {
+            Get.snackbar("Input Tidak Valid", "Nilai harus berupa angka antara 0 dan 100.");
+          }
+        },
+        child: controller.isSaving.value ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text("Simpan"),
+      )),
+      cancel: TextButton(onPressed: Get.back, child: const Text("Batal")),
+    );
+  }
 }
+
+// // lib/app/modules/input_nilai_siswa/views/input_nilai_siswa_view.dart (KODE DENGAN PERBAIKAN)
+
+// import 'package:flutter/material.dart';
+// import 'package:get/get.dart';
+// import 'package:intl/intl.dart';
+// import 'package:sdtq_telagailmu_yogyakarta/app/models/atp_model.dart';
+// import 'package:sdtq_telagailmu_yogyakarta/app/models/nilai_harian_model.dart';
+// import '../controllers/input_nilai_siswa_controller.dart';
+
+// class InputNilaiSiswaView extends GetView<InputNilaiSiswaController> {
+//   const InputNilaiSiswaView({Key? key}) : super(key: key);
+
+//   @override
+//   Widget build(BuildContext context) {
+//     final RxString selectedKategori = "Harian/PR".obs;
+
+//     return Scaffold(
+//       appBar: AppBar(
+//         title: Column(
+//           children: [
+//             Text(controller.namaMapel, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+//             Text(controller.siswa.namaLengkap, style: const TextStyle(fontSize: 14)),
+//           ],
+//         ),
+//         centerTitle: true,
+//         // --- [TAMBAHAN OPSIONAL] Tombol Simpan Terpusat untuk Capaian ---
+//         actions: [
+//           Obx(() {
+//             // Hanya tampilkan tombol simpan jika ada ATP atau deskripsi manual yang diisi
+//             bool canShowButton = controller.atpModel.value != null || controller.deskripsiCapaianC.text.isNotEmpty;
+//             if (!canShowButton) return const SizedBox.shrink();
+
+//             return controller.isSaving.value
+//               ? const Padding(padding: EdgeInsets.all(16.0), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white)))
+//               : TextButton(
+//                   onPressed: controller.simpanSemuaCapaian,
+//                   child: Text("SIMPAN", style: TextStyle(color: Colors.indigo[900], fontWeight: FontWeight.bold)),
+//                 );
+//           }),
+//         ],
+//       ),
+//       body: Obx(() {
+//         if (controller.isLoading.value) return const Center(child: CircularProgressIndicator());
+//         return ListView(
+//           padding: const EdgeInsets.all(16),
+//           children: [
+//             _buildNilaiAkhirCard(),
+//             const SizedBox(height: 24),
+//             Text("Penilaian Sumatif", style: Get.textTheme.titleLarge),
+//             const SizedBox(height: 8),
+//             _buildKategoriSelector(selectedKategori),
+//             const SizedBox(height: 16),
+//             Obx(() => _buildKontenNilai(selectedKategori.value)),
+//             const Divider(height: 48, thickness: 1),
+            
+//             // --- Widget yang logikanya diperbaiki ---
+//             _buildKurikulumMerdekaSection(),
+
+//             Obx(() {
+//               if (controller.isWaliKelas.value) {
+//                 return _buildRekapWaliKelas();
+//               }
+//               return const SizedBox.shrink();
+//             }),
+//           ],
+//         );
+//       }),
+//     );
+//   }
+
+//   Widget _buildRekapWaliKelas() {
+//     return Padding(
+//       padding: const EdgeInsets.only(top: 24.0),
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           const Divider(height: 32),
+//           Text("Rekap Nilai Siswa (Akses Wali Kelas)", style: Get.textTheme.titleLarge),
+//           const SizedBox(height: 8),
+//           Obx(() {
+//             if (controller.rekapNilaiMapelLain.isEmpty) {
+//               return const Card(child: Padding(padding: EdgeInsets.all(16), child: Text("Belum ada nilai dari mapel lain.")));
+//             }
+//             return Card(
+//               child: Column(
+//                 children: controller.rekapNilaiMapelLain.map((rekap) => ListTile(
+//                   title: Text(rekap['mapel']),
+//                   subtitle: Text("Guru: ${rekap['guru']}"),
+//                   trailing: Text(
+//                     (rekap['nilai_akhir'] as double).toStringAsFixed(1),
+//                     style: Get.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+//                   ),
+//                 )).toList(),
+//               ),
+//             );
+//           }),
+//         ],
+//       ),
+//     );
+//   }
+
+//   // --- [PERUBAHAN 1 DARI BLUEPRINT] ---
+//   // Logika tampilan kini dipusatkan di sini.
+//   Widget _buildKurikulumMerdekaSection() {
+//     return Column(
+//       crossAxisAlignment: CrossAxisAlignment.start,
+//       children: [
+//         Text("Capaian Pembelajaran", style: Get.textTheme.titleLarge),
+//         const SizedBox(height: 8),
+//         Obx(() {
+//           if (controller.atpModel.value == null) {
+//             // KONDISI 1: ATP tidak ada. Tampilkan HANYA card deskripsi manual.
+//             return _buildDeskripsiManualCard(isAtpAvailable: false);
+//           } else {
+//             // KONDISI 2: ATP ada. Tampilkan daftar TP, diikuti card catatan tambahan.
+//             return Column(
+//               crossAxisAlignment: CrossAxisAlignment.stretch,
+//               children: [
+//                 _buildTPList(controller.atpModel.value!),
+//                 const SizedBox(height: 16),
+//                 _buildDeskripsiManualCard(isAtpAvailable: true),
+//               ],
+//             );
+//           }
+//         }),
+//       ],
+//     );
+//   }
+
+//   // --- [PERUBAHAN 2 DARI BLUEPRINT] ---
+//   // Widget ini sekarang bersih dan hanya bertanggung jawab untuk menampilkan daftar TP.
+//   // Pemanggilan _buildDeskripsiManualCard dari sini telah DIHAPUS.
+//   Widget _buildTPList(AtpModel atp) {
+//     return Column(
+//       crossAxisAlignment: CrossAxisAlignment.start,
+//       children: [
+//         const Text("Pilih capaian siswa berdasarkan Tujuan Pembelajaran (TP) yang ada.", style: TextStyle(color: Colors.grey)),
+//         const SizedBox(height: 12),
+//         ...atp.unitPembelajaran.map((unit) => Card(
+//           margin: const EdgeInsets.only(bottom: 16),
+//           child: Padding(
+//             padding: const EdgeInsets.all(16.0),
+//             child: Column(
+//               crossAxisAlignment: CrossAxisAlignment.start,
+//               children: [
+//                 Text(unit.lingkupMateri, style: Get.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+//                 const Divider(height: 16),
+//                 ...unit.tujuanPembelajaran.map((tp) => _buildTPItem(tp)).toList(),
+//               ],
+//             ),
+//           ),
+//         )).toList(),
+//       ],
+//     );
+//   }
+  
+//   // Widget ini TIDAK BERUBAH. Tombol Tercapai/Perlu Bimbingan sudah ada di sini.
+//   Widget _buildTPItem(String tp) {
+//     return Padding(
+//       padding: const EdgeInsets.symmetric(vertical: 4.0),
+//       child: Row(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           Expanded(child: Text("• $tp", style: const TextStyle(height: 1.4))),
+//           const SizedBox(width: 8),
+//           Obx(() {
+//             final status = controller.capaianTpSiswa[tp];
+//             return ToggleButtons(
+//               borderRadius: BorderRadius.circular(8),
+//               constraints: const BoxConstraints(minHeight: 32.0),
+//               isSelected: [status == 'Tercapai', status == 'Perlu Bimbingan'],
+//               onPressed: (index) {
+//                 controller.setCapaianTp(tp, index == 0 ? 'Tercapai' : 'Perlu Bimbingan');
+//               },
+//               children: const [
+//                 Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text("T")),
+//                 Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text("PB")),
+//               ],
+//             );
+//           }),
+//         ],
+//       ),
+//     );
+//   }
+
+//   // Widget ini TIDAK BERUBAH.
+//   Widget _buildDeskripsiManualCard({bool isAtpAvailable = false}) {
+//     return Card(
+//       child: Padding(
+//         padding: const EdgeInsets.all(16.0),
+//         child: Column(
+//           crossAxisAlignment: CrossAxisAlignment.stretch,
+//           children: [
+//             Text(isAtpAvailable ? "Catatan / Deskripsi Tambahan" : "Deskripsi Manual", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+//             const SizedBox(height: 4),
+//             Text(isAtpAvailable ? "Isi deskripsi jika ada catatan khusus yang perlu ditambahkan selain dari capaian TP." : "Karena ATP belum diatur, isi deskripsi capaian siswa secara manual.", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+//             const SizedBox(height: 16),
+//             TextField(controller: controller.deskripsiCapaianC, maxLines: 4, decoration: const InputDecoration(border: OutlineInputBorder(), labelText: "Deskripsi Capaian Siswa")),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+
+//   Widget _buildNilaiAkhirCard() {
+//     return Card(
+//       elevation: 4,
+//       color: Get.theme.primaryColor,
+//       child: Padding(
+//         padding: const EdgeInsets.all(20.0),
+//         child: Column(
+//           children: [
+//             const Text("NILAI AKHIR RAPOR", style: TextStyle(color: Colors.white70, fontSize: 14)),
+//             const SizedBox(height: 8),
+//             Obx(() => Text(
+//               controller.nilaiAkhir.value?.toStringAsFixed(1) ?? '-',
+//               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 42),
+//             )),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+
+//   Widget _buildKategoriSelector(RxString selectedKategori) {
+//     final kategori = ["Harian/PR", "Ulangan Harian", "PTS", "PAS", "Nilai Tambahan"];
+//     return SizedBox(
+//       height: 40,
+//       child: ListView(
+//         scrollDirection: Axis.horizontal,
+//         children: kategori.map((item) => Padding(
+//           padding: const EdgeInsets.only(right: 8.0),
+//           child: Obx(() => ChoiceChip(
+//             label: Text(item),
+//             selectedColor: Get.theme.primaryColor.withOpacity(0.8),
+//             labelStyle: TextStyle(color: selectedKategori.value == item ? Colors.white : Colors.black),
+//             selected: selectedKategori.value == item,
+//             onSelected: (selected) { if (selected) selectedKategori.value = item; },
+//           )),
+//         )).toList(),
+//       ),
+//     );
+//   }
+
+//   Widget _buildKontenNilai(String kategori) {
+//     switch (kategori) {
+//       case "PTS":
+//         return _buildNilaiUtamaCard("Penilaian Tengah Semester", controller.nilaiPTS, 'nilai_pts');
+//       case "PAS":
+//         return _buildNilaiUtamaCard("Penilaian Akhir Semester", controller.nilaiPAS, 'nilai_pas');
+//       default:
+//         return _buildNilaiHarianList(kategori);
+//     }
+//   }
+
+//   Widget _buildNilaiUtamaCard(String title, Rxn<int> nilaiState, String fieldName) {
+//     return Card(
+//       child: ListTile(
+//         title: Text(title),
+//         trailing: Obx(() => Text(
+//           nilaiState.value?.toString() ?? "Belum Diisi",
+//           style: Get.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: nilaiState.value == null ? Colors.grey : null),
+//         )),
+//         onTap: () => _showInputDialog(
+//           title: "Input $title",
+//           initialValue: nilaiState.value?.toString() ?? '',
+//           onSave: (nilai) => controller.simpanNilaiUtama(fieldName, nilai),
+//         ),
+//       ),
+//     );
+//   }
+
+//   Widget _buildNilaiHarianList(String kategori) {
+//     return Column(
+//       crossAxisAlignment: CrossAxisAlignment.stretch,
+//       children: [
+//         Obx(() {
+//           final listNilai = controller.daftarNilaiHarian.where((n) {
+//             if (kategori == "Harian/PR") return n.kategori == "Harian/PR" || n.kategori == "PR";
+//             return n.kategori == kategori;
+//           }).toList();
+
+//           if (listNilai.isEmpty) return Padding(
+//             padding: const EdgeInsets.symmetric(vertical: 32.0),
+//             child: Center(child: Text("Belum ada nilai untuk kategori ini.", style: TextStyle(color: Colors.grey.shade600))),
+//           );
+          
+//           return Column(
+//             children: listNilai.map((nilai) => Card(
+//               margin: const EdgeInsets.only(bottom: 8),
+//               child: ListTile(
+//                 leading: CircleAvatar(child: Text(nilai.nilai.toString())),
+//                 title: Text(nilai.catatan.isNotEmpty ? nilai.catatan : "Nilai ${nilai.kategori}"),
+//                 subtitle: Text(DateFormat('dd MMM yyyy, HH:mm').format(nilai.tanggal)),
+//                 trailing: PopupMenuButton<String>(
+//                   onSelected: (value) {
+//                     if (value == 'edit') {
+//                       _showInputDialog(
+//                         title: "Edit Nilai ${nilai.kategori}", showCatatan: true,
+//                         initialValue: nilai.nilai.toString(), initialCatatan: nilai.catatan,
+//                         onSave: (_) => controller.updateNilaiHarian(nilai.id),
+//                       );
+//                     } else if (value == 'hapus') {
+//                       controller.deleteNilaiHarian(nilai.id);
+//                     }
+//                   },
+//                   itemBuilder: (context) => [
+//                     const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit_outlined), title: Text('Edit'))),
+//                     const PopupMenuItem(value: 'hapus', child: ListTile(leading: Icon(Icons.delete_outline), title: Text('Hapus', style: TextStyle(color: Colors.red)))),
+//                   ],
+//                 ),
+//               ),
+//             )).toList(),
+//           );
+//         }),
+//         const SizedBox(height: 16),
+//         ElevatedButton.icon(
+//           icon: const Icon(Icons.add),
+//           label: Text("Tambah Nilai $kategori"),
+//           onPressed: () => _showInputDialog(
+//             title: "Tambah Nilai $kategori",
+//             showCatatan: true,
+//             onSave: (_) => controller.simpanNilaiHarian(kategori),
+//           ),
+//         ),
+//       ],
+//     );
+//   }
+
+//   void _showInputDialog({
+//     required String title, String initialValue = '', String initialCatatan = '',
+//     bool showCatatan = false, required Function(int) onSave,
+//     }) {
+//     controller.nilaiC.text = initialValue;
+//     controller.catatanC.text = initialCatatan;
+//     Get.defaultDialog(
+//       title: title,
+//       content: Column(
+//         children: [
+//           TextField(controller: controller.nilaiC, decoration: const InputDecoration(labelText: 'Nilai (0-100)'), keyboardType: TextInputType.number),
+//           if (showCatatan) TextField(controller: controller.catatanC, decoration: const InputDecoration(labelText: 'Catatan (Opsional)')),
+//         ],
+//       ),
+//       confirm: Obx(() => ElevatedButton(
+//         onPressed: controller.isSaving.value ? null : () {
+//           int? nilai = int.tryParse(controller.nilaiC.text);
+//           if (nilai != null && nilai >= 0 && nilai <= 100) {
+//             onSave(nilai);
+//           } else {
+//             Get.snackbar("Input Tidak Valid", "Nilai harus berupa angka antara 0 dan 100.");
+//           }
+//         },
+//         child: controller.isSaving.value ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text("Simpan"),
+//       )),
+//       cancel: TextButton(onPressed: Get.back, child: const Text("Batal")),
+//     );
+//   }
+// }
