@@ -20,13 +20,40 @@ class DashboardView extends GetView<DashboardController> {
 
     return Obx(() {
       final List<Map<String, dynamic>> quickAccessMenus = [
-        {'image': 'daftar_tes.png', 'title': 'Guru Akademik', 'route': Routes.GURU_AKADEMIK},
+      //   if(controller.isPimpinan)
+      //   {'image': 'mata_elang.png', 'title': 'Laporan Akademik', 'route': Routes.LAPORAN_AKADEMIK},
+      //   else {
+      //     {'image': 'daftar_tes.png', 'title': 'Guru Akademik', 'route': Routes.GURU_AKADEMIK},
+      //   }
+        
+      //   if (controller.canManageHalaqah)
+      //     {'image': 'daftar_tes.png', 'title': 'Manajemen Halaqah', 'onTap': controller.goToHalaqahManagement},
+      //   if (controller.isPengampuHalaqah)
+      //     {'image': 'daftar_tes.png', 'title': 'Dashboard Halaqah', 'onTap': controller.goToHalaqahDashboard},
+      //   if (controller.isPimpinan)
+      //     {'image': 'papan_list.png', 'title': 'Rekap Absensi', 'onTap': controller.goToRekapAbsensiSekolah},
+      //   {'image': 'toga_lcd.png', 'title': 'Pemberian Kelas', 'route': Routes.PEMBERIAN_KELAS_SISWA},
+      //   {'image': 'papan_list.png', 'title': 'Master Mapel', 'route': Routes.MASTER_MAPEL},
+      //   {'image': 'list_nilai.png', 'title': 'Penugasan Guru', 'route': Routes.PENUGASAN_GURU},
+      //   {'image': 'layar.png', 'title': 'Jadwal Pelajaran', 'route': Routes.JADWAL_PELAJARAN},
+      //   {'image': 'faq.png', 'title': 'Lainnya', 'onTap': () => _showAllMenus(context)},
+      // ];
+
+      if (controller.kepalaSekolah)
+          {'image': 'akademik_1.png', 'title': 'Laporan Akademik', 'route': Routes.LAPORAN_AKADEMIK}
+        else
+          {'image': 'daftar_tes.png', 'title': 'Guru Akademik', 'route': Routes.GURU_AKADEMIK},
+        
+        // --- SISA MENU ---
         if (controller.canManageHalaqah)
           {'image': 'daftar_tes.png', 'title': 'Manajemen Halaqah', 'onTap': controller.goToHalaqahManagement},
+        if (controller.kepalaSekolah)
+        {'image': 'akademik_2.png', 'title': 'Laporan Halaqah', 'route': Routes.LAPORAN_HALAQAH},
         if (controller.isPengampuHalaqah)
           {'image': 'daftar_tes.png', 'title': 'Dashboard Halaqah', 'onTap': controller.goToHalaqahDashboard},
         if (controller.isPimpinan)
           {'image': 'papan_list.png', 'title': 'Rekap Absensi', 'onTap': controller.goToRekapAbsensiSekolah},
+        
         {'image': 'toga_lcd.png', 'title': 'Pemberian Kelas', 'route': Routes.PEMBERIAN_KELAS_SISWA},
         {'image': 'papan_list.png', 'title': 'Master Mapel', 'route': Routes.MASTER_MAPEL},
         {'image': 'list_nilai.png', 'title': 'Penugasan Guru', 'route': Routes.PENUGASAN_GURU},
@@ -62,7 +89,15 @@ class DashboardView extends GetView<DashboardController> {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          Text(configC.infoUser['nama'] ?? 'Nama Pengguna', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold, shadows: [Shadow(blurRadius: 2, color: Colors.black45)])),
+                           Obx(() => Text(
+                                configC.infoUser['alias'] ?? 'Nama Pengguna',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  shadows: [Shadow(blurRadius: 2, color: Colors.black45)],
+                                ),
+                              )),
                         ],
                       ),
                     ),
@@ -364,6 +399,8 @@ class DashboardView extends GetView<DashboardController> {
       {'image': 'akademik_2.png', 'title': 'info sekolah', 'route': Routes.INFO_SEKOLAH},
       {'image': 'akademik_2.png', 'title': 'info sekolah form', 'route': Routes.INFO_SEKOLAH_FORM},
       {'image': 'abc_papan.png', 'title': 'perangkat ajar', 'route': Routes.PERANGKAT_AJAR},
+      {'image': 'abc_papan.png', 'title': 'buat jadwal', 'route': Routes.EDITOR_JADWAL},
+      {'image': 'emc2.png', 'title': 'Bobot Nilai', 'route': Routes.PENGATURAN_BOBOT_NILAI},
       // Tambahkan menu lainnya di sini sesuai kebutuhan
     ];
 

@@ -100,9 +100,19 @@ class EditorJadwalController extends GetxController {
 
   Future<void> _fetchDaftarJam() async {
     final snapshot = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('jampelajaran').orderBy('urutan').get();
-    daftarJam.value = snapshot.docs.map((doc) => {
-      'id': doc.id, 'label': "${doc.data()['namaKegiatan']} (${doc.data()['jampelajaran']})", 'waktu': doc.data()['jampelajaran'],
+    
+    // --- [PERBAIKAN] Tambahkan pengecekan null dengan fallback string kosong ---
+    daftarJam.value = snapshot.docs.map((doc) {
+      final data = doc.data();
+      final nama = data['namaKegiatan'] as String? ?? '';
+      final waktu = data['jampelajaran'] as String? ?? '';
+      return {
+        'id': doc.id, 
+        'label': "$nama ($waktu)", 
+        'waktu': waktu,
+      };
     }).toList();
+    // -------------------------------------------------------------------------
   }
 
   Future<void> _fetchGuruDanMapel() async {
@@ -118,12 +128,45 @@ class EditorJadwalController extends GetxController {
 
       for(var doc in snapshot.docs) {
         final data = doc.data();
-        daftarGuruTersedia.add({'uid': data['idGuru'], 'nama': data['guru'], 'idMapel': data['idMapel']});
+        
+        // --- [PERBAIKAN] Ambil data dengan fallback untuk mencegah null ---
+        final namaGuru = data['namaGuru'] as String? ?? 'Tanpa Nama';
+        final aliasGuru = data['aliasGuru'] as String?;
+        final namaMapel = data['namamatapelajaran'] as String? ?? 'Tanpa Nama Mapel';
+        // -----------------------------------------------------------------
+
+        daftarGuruTersedia.add({
+          'uid': data['idGuru'],
+          'nama': namaGuru, 
+          'alias': (aliasGuru == null || aliasGuru.isEmpty) ? namaGuru : aliasGuru,
+          'idMapel': data['idMapel']
+        });
+
         if (uniqueMapelIds.add(data['idMapel'])) {
-          daftarMapelTersedia.add({'idMapel': data['idMapel'], 'nama': data['namamatapelajaran']});
+          daftarMapelTersedia.add({'idMapel': data['idMapel'], 'nama': namaMapel});
         }
       }
     } catch(e) { Get.snackbar("Error", "Gagal memuat data guru & mapel: $e"); } 
+  }
+
+  void updatePelajaran(int index, String key, dynamic value) {
+    final pelajaran = jadwalPelajaran[selectedHari.value]![index];
+    if (key == 'idMapel') {
+      final mapel = daftarMapelTersedia.firstWhere((m) => m['idMapel'] == value, orElse: () => {});
+      pelajaran['idMapel'] = value;
+      pelajaran['namaMapel'] = mapel['nama'];
+      pelajaran['idGuru'] = null;
+      pelajaran['namaGuru'] = null;
+    } else if (key == 'idGuru') {
+      final guru = daftarGuruTersedia.firstWhere((g) => g['uid'] == value, orElse: () => {});
+      pelajaran['idGuru'] = value;
+      // --- [PERBAIKAN] Simpan 'alias' guru ke dalam jadwal ---
+      pelajaran['namaGuru'] = guru['alias'];
+      // -------------------------------------------------------
+    } else {
+      pelajaran[key] = value;
+    }
+    jadwalPelajaran[selectedHari.value]!.refresh();
   }
 
   void _clearJadwal() { 
@@ -140,24 +183,6 @@ class EditorJadwalController extends GetxController {
 
   void hapusPelajaran(int index) {
     jadwalPelajaran[selectedHari.value]?.removeAt(index);
-  }
-
-  void updatePelajaran(int index, String key, dynamic value) {
-    final pelajaran = jadwalPelajaran[selectedHari.value]![index];
-    if (key == 'idMapel') {
-      final mapel = daftarMapelTersedia.firstWhere((m) => m['idMapel'] == value, orElse: () => {});
-      pelajaran['idMapel'] = value;
-      pelajaran['namaMapel'] = mapel['nama'];
-      pelajaran['idGuru'] = null; // Reset guru
-      pelajaran['namaGuru'] = null;
-    } else if (key == 'idGuru') {
-      final guru = daftarGuruTersedia.firstWhere((g) => g['uid'] == value, orElse: () => {});
-      pelajaran['idGuru'] = value;
-      pelajaran['namaGuru'] = guru['nama'];
-    } else {
-      pelajaran[key] = value;
-    }
-    jadwalPelajaran[selectedHari.value]!.refresh();
   }
 
   Future<void> simpanJadwal() async {

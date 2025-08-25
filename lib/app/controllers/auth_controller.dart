@@ -4,6 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../modules/home/controllers/home_controller.dart';
+import '../modules/login/controllers/login_controller.dart';
+import '../routes/app_pages.dart';
 import 'config_controller.dart'; // atau 'aplikasi_orangtua'
 
 class AuthController extends GetxController {
@@ -46,21 +49,33 @@ class AuthController extends GetxController {
   Future<void> logout() async {
     try {
       isLoading.value = true;
+
+      // Hancurkan instance LoginController yang mungkin ada
+      if (Get.isRegistered<LoginController>()) {
+        Get.delete<LoginController>(force: true);
+      }
+
+      // --- [PERBAIKAN FINAL] ---
+      // Hancurkan juga HomeController secara paksa untuk mencegah 'zombie controller'.
+      if (Get.isRegistered<HomeController>()) {
+        Get.delete<HomeController>(force: true);
+      }
+      // --------------------------
+
+      Get.offAllNamed(AppPages.INITIAL); 
+
+      await Future.delayed(const Duration(milliseconds: 150));
+      
       if (Get.isRegistered<ConfigController>()) {
         final configC = Get.find<ConfigController>();
         await configC.clearUserConfig();
       }
       
       await auth.signOut();
-      
-      // --- [FIX] Beri jeda agar state stream selesai diproses ---
-      // Ini akan mencegah error race condition saat membangun ulang widget tree.
-      await Future.delayed(Duration.zero); 
-      
-      Get.offAllNamed('/login');
 
     } catch (e) {
-      Get.snackbar("Error", "Gagal untuk logout. Silakan coba lagi.", snackPosition: SnackPosition.BOTTOM);
+      Get.snackbar("Error", "Gagal untuk logout: ${e.toString()}", snackPosition: SnackPosition.BOTTOM);
+      Get.offAllNamed(AppPages.INITIAL);
     } finally {
       isLoading.value = false;
     }

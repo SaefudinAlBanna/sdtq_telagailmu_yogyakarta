@@ -30,6 +30,13 @@ class DashboardController extends GetxController {
            peranSistem == 'superadmin';
   }
 
+  bool get kepalaSekolah {
+    final user = configC.infoUser;
+    if (user.isEmpty) return false;
+    final role = user['role'] ?? '';
+    return ['Kepala Sekolah'].contains(role);
+  }
+
   bool get canManageHalaqah {
     final user = configC.infoUser;
     if (user.isEmpty) return false;
@@ -230,7 +237,12 @@ class DashboardController extends GetxController {
         final tglSelesai = (data['tanggalSelesai'] as Timestamp).toDate();
         if (todayWithoutTime.isBefore(tglSelesai.add(const Duration(days: 1)))) {
           final isLibur = data['isLibur'] as bool? ?? false;
-          daftarCarousel.assignAll([ CarouselItemModel( namaKelas: "Info Sekolah", tipe: CarouselContentType.Info, judul: isLibur ? "HARI LIBUR" : "INFO KEGIATAN", isi: data['namaKegiatan'] as String? ?? 'Tanpa Judul', ikon: isLibur ? Icons.weekend_rounded : Icons.event_note_rounded, warna: isLibur ? Colors.green.shade700 : Colors.teal.shade700) ]);
+          // --- [PERBAIKAN WARNA] ---
+          daftarCarousel.assignAll([ CarouselItemModel( namaKelas: "Info Sekolah", 
+          tipe: CarouselContentType.Info, judul: isLibur ? "HARI LIBUR" : "INFO KEGIATAN", 
+          isi: data['namaKegiatan'] as String? ?? 'Tanpa Judul', 
+          ikon: isLibur ? Icons.weekend_rounded : Icons.event_note_rounded, 
+          warna: isLibur ? Colors.red.shade400 : Colors.teal.shade700) ]);
           isCarouselLoading.value = false; return;
         }
       }
@@ -238,8 +250,12 @@ class DashboardController extends GetxController {
       // --- [Prioritas #2: Hari Libur (Sabtu/Minggu)] ---
       if (now.weekday == DateTime.saturday || now.weekday == DateTime.sunday) {
         final String pesanLiburDariDb = configC.konfigurasiDashboard['pesanDefaultLibur'] as String? ?? "";
-        final String pesanLiburFinal = pesanLiburDariDb.trim().isEmpty ? "Tetap semangat belajar dan muroja'ah yaa.." : pesanLiburDariDb;
-        daftarCarousel.assignAll([ CarouselItemModel( namaKelas: "Info Sekolah", tipe: CarouselContentType.Default, judul: "SELAMAT BERAKHIR PEKAN", isi: pesanLiburFinal, ikon: Icons.beach_access_rounded, warna: Colors.lightBlue.shade700) ]);
+        final String pesanLiburFinal = pesanLiburDariDb.trim().isEmpty ? 
+        "Tetap semangat belajar dan muroja'ah yaa.." : pesanLiburDariDb;
+        // --- [PERBAIKAN WARNA] ---
+        daftarCarousel.assignAll([ CarouselItemModel( namaKelas: "Info Sekolah", tipe: CarouselContentType.Default, 
+        judul: "SELAMAT BERAKHIR PEKAN", isi: pesanLiburFinal, ikon: Icons.beach_access_rounded, 
+        warna: Colors.blue.shade700) ]);
         isCarouselLoading.value = false; return;
       }
 
@@ -280,8 +296,13 @@ class DashboardController extends GetxController {
               final rekap = absensiData['rekap'];
               itemForThisClass = CarouselItemModel(namaKelas: idKelas.split('-').first, tipe: CarouselContentType.Info, judul: "Kehadiran Hari Ini", isi: "H:${rekap['hadir']??0}, S:${rekap['sakit']??0}, I:${rekap['izin']??0}, A:${rekap['alfa']??0}", ikon: Icons.checklist_rtl_rounded, warna: Colors.green.shade800);
             } else {
-              final String pesanSelesaiDariDb = configC.konfigurasiDashboard['pesanDefaultSetelahKBM'] as String? ?? ""; final String pesanSelesaiFinal = pesanSelesaiDariDb.trim().isEmpty ? "Aktivitas belajar telah usai." : pesanSelesaiDariDb;
-              itemForThisClass = CarouselItemModel(namaKelas: idKelas.split('-').first, tipe: CarouselContentType.Default, judul: "KBM Selesai", isi: pesanSelesaiFinal, ikon: Icons.check_circle_outline_rounded, warna: Colors.grey.shade700);
+              final String pesanSelesaiDariDb = configC.konfigurasiDashboard['pesanDefaultSetelahKBM'] as String? ?? ""; 
+              final String pesanSelesaiFinal = pesanSelesaiDariDb.trim().isEmpty ? 
+              "Aktivitas belajar telah usai." : pesanSelesaiDariDb;
+              // --- [PERBAIKAN WARNA] ---
+              itemForThisClass = CarouselItemModel(namaKelas: idKelas.split('-').first, 
+              tipe: CarouselContentType.Default, judul: "KBM Selesai", isi: pesanSelesaiFinal, 
+              ikon: Icons.check_circle_outline_rounded, warna: Colors.blueGrey.shade700);
             }
           }
           carouselItems.add(itemForThisClass);

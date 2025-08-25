@@ -67,6 +67,10 @@ abstract class Routes {
   static const PERANGKAT_AJAR = _Paths.PERANGKAT_AJAR;
   static const PROTA_PROSEM = _Paths.PROTA_PROSEM;
   static const MODUL_AJAR_FORM = _Paths.MODUL_AJAR_FORM;
+  static const PROFILE = _Paths.PROFILE;
+  static const PENGATURAN_BOBOT_NILAI = _Paths.PENGATURAN_BOBOT_NILAI;
+  static const LAPORAN_AKADEMIK = _Paths.LAPORAN_AKADEMIK;
+  static const LAPORAN_HALAQAH = _Paths.LAPORAN_HALAQAH;
 }
 
 abstract class _Paths {
@@ -134,4 +138,8 @@ abstract class _Paths {
   static const PERANGKAT_AJAR = '/perangkat-ajar';
   static const PROTA_PROSEM = '/prota-prosem';
   static const MODUL_AJAR_FORM = '/modul-ajar-form';
+  static const PROFILE = '/profile';
+  static const PENGATURAN_BOBOT_NILAI = '/pengaturan-bobot-nilai';
+  static const LAPORAN_AKADEMIK = '/laporan-akademik';
+  static const LAPORAN_HALAQAH = '/laporan-halaqah';
 }

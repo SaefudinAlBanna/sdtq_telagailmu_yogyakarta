@@ -136,19 +136,35 @@ class ConfigController extends GetxController {
   }
 }
 
-  /// Mengambil profil pengguna dari Firestore.
   Future<bool> _syncProfileWithFirestore(String uid) async {
     try {
       final userDoc = await _firestore.collection('Sekolah').doc(idSekolah).collection('pegawai').doc(uid).get();
       if (userDoc.exists && userDoc.data() != null) {
-        infoUser.value = userDoc.data()!;
-        await _box.write('userProfile', userDoc.data());
+        final Map<String, dynamic> firestoreData = userDoc.data()!;
+        
+        // Data ini yang akan kita gunakan di memori aplikasi
+        infoUser.value = firestoreData;
+
+        // --- [PERBAIKAN KRUSIAL] ---
+        // Buat salinan data untuk disimpan ke cache
+        final Map<String, dynamic> dataForCache = Map<String, dynamic>.from(firestoreData);
+
+        // Periksa dan konversi field Timestamp ke String (ISO 8601)
+        if (dataForCache['tglgabung'] is Timestamp) {
+          dataForCache['tglgabung'] = (dataForCache['tglgabung'] as Timestamp).toDate().toIso8601String();
+        }
+        // Lakukan hal yang sama untuk field timestamp lain jika ada
+        
+        // Simpan data yang sudah aman (safe-to-encode) ke GetStorage
+        await _box.write('userProfile', dataForCache);
+        // --- AKHIR PERBAIKAN ---
+
         return true;
       } else {
         throw Exception("Profil pegawai tidak ditemukan.");
       }
     } catch (e) {
-      await _authController.logout();
+      await _authController.logout(); // authController sudah ada di scope class
       return false;
     }
   }
@@ -203,9 +219,30 @@ class ConfigController extends GetxController {
 
   /// Memuat profil dari cache lokal saat aplikasi dimulai.
   void _loadProfileFromCache() {
-    final cachedProfile = _box.read('userProfile');
-    if (cachedProfile != null && cachedProfile is Map<String, dynamic>) {
-      infoUser.value = cachedProfile;
+    // Gunakan <Map<String, dynamic>> untuk type safety
+    final cachedProfile = _box.read<Map<String, dynamic>>('userProfile');
+    
+    if (cachedProfile != null) {
+      // --- [PERBAIKAN KRUSIAL] ---
+      // Buat salinan yang bisa diubah
+      final Map<String, dynamic> processedProfile = Map<String, dynamic>.from(cachedProfile);
+
+      // Periksa apakah 'tglgabung' ada dan merupakan String
+      if (processedProfile['tglgabung'] is String) {
+        try {
+          // Konversi kembali String (ISO 8601) menjadi DateTime, lalu ke Timestamp
+          final DateTime parsedDate = DateTime.parse(processedProfile['tglgabung']);
+          processedProfile['tglgabung'] = Timestamp.fromDate(parsedDate);
+        } catch (e) {
+          // Jika parsing gagal, hapus key yang rusak agar tidak menyebabkan error
+          processedProfile.remove('tglgabung');
+          print("### Peringatan: Gagal mem-parsing 'tglgabung' dari cache: $e");
+        }
+      }
+      
+      // Masukkan data yang sudah diproses dan konsisten ke infoUser
+      infoUser.value = processedProfile;
+      // --- AKHIR PERBAIKAN ---
     }
   }
   
@@ -222,5 +259,12 @@ class ConfigController extends GetxController {
 
   Future<void> reloadKonfigurasiDashboard() async {
   await _syncKonfigurasiDashboard();
+}
+
+Future<void> forceSyncProfile() async {
+    final user = _authController.auth.currentUser;
+    if (user != null) {
+      await _syncProfileWithFirestore(user.uid);
+    }
 }
 }

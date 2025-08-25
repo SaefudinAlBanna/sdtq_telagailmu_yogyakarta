@@ -111,11 +111,20 @@ class UpsertPegawaiController extends GetxController {
 
         String uid = pegawaiCredential.user!.uid;
         final dataToSave = {
+          // --- Data Inti (Tidak Berubah) ---
           'uid': uid, 'email': emailC.text.trim(), 'createdAt': FieldValue.serverTimestamp(), 'createdBy': adminEmail,
           'mustChangePassword': true,
           'nama': namaC.text.trim(), 'jeniskelamin': jenisKelamin.value,
-          'alias': "${jenisKelamin.value == "Laki-Laki" ? "Ustadz" : "Ustazah"} ${namaC.text.trim()}",
+          'alias': "${jenisKelamin.value == "Laki-Laki" ? "Ustadz" : "Ustadzah"} ${namaC.text.trim()}",
           'role': jabatanTerpilih.value, 'tugas': tugasTerpilih.toList(),
+
+          // --- [PERBAIKAN] Tambahkan field baru dengan nilai default ---
+          'nip': '', // Default: string kosong
+          'noTelp': '', // Default: string kosong
+          'alamat': '', // Default: string kosong
+          'tglgabung': null, // Default: null
+          'profileImageUrl': null, // Default: null
+          // --- AKHIR PERBAIKAN ---
         };
         await _firestore.collection("Sekolah").doc(configC.idSekolah).collection('pegawai').doc(uid).set(dataToSave);
         

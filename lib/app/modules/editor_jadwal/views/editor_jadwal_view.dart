@@ -89,7 +89,8 @@ class EditorJadwalView extends GetView<EditorJadwalController> {
             final guruUntukMapelIni = controller.daftarGuruTersedia.where((g) => g['idMapel'] == idMapelTerpilih).toList();
             return DropdownButtonFormField<String>(
               value: pelajaran['idGuru'],
-              items: guruUntukMapelIni.map((g) => DropdownMenuItem<String>(value: g['uid'], child: Text(g['nama']))).toList(),
+              items: guruUntukMapelIni.map((g) => DropdownMenuItem<String>(value: g['uid'], 
+              child: Text(g['alias']))).toList(),
               onChanged: (v) => controller.updatePelajaran(index, 'idGuru', v),
             );
           }),

@@ -1,28 +1,28 @@
-// lib/app/modules/home/bindings/home_binding.dart
+import 'package:get/get.dart';
+
+// Import controller yang baru kita buat
+
+// import '../../../controllers/dashboard_controller.dart';
+// import '../../profile/controllers/profile_controller.dart';
+// import '../controllers/home_controller.dart';
 
 import 'package:get/get.dart';
-import 'package:sdtq_telagailmu_yogyakarta/app/controllers/dashboard_controller.dart';
 import '../controllers/home_controller.dart';
 
 class HomeBinding extends Bindings {
   @override
   void dependencies() {
-    Get.lazyPut<HomeController>(() => HomeController());
-    // --- [PENTING] Daftarkan DashboardController di sini ---
-    Get.lazyPut<DashboardController>(() => DashboardController());
+    // Get.lazyPut<HomeController>(
+    //   () => HomeController(),
+    // );
+
+    // Get.lazyPut<DashboardController>(() => DashboardController());
+
+    // // --- TAMBAHKAN BARIS INI ---
+    // // Daftarkan ProfileController di sini agar siap digunakan oleh ProfileView di dalam HomeView.
+    // Get.lazyPut<ProfileController>(
+    //   () => ProfileController(),
+    // );
+    // ---------------------------
   }
 }
-
-
-// import 'package:get/get.dart';
-
-// import '../controllers/home_controller.dart';
-
-// class HomeBinding extends Bindings {
-//   @override
-//   void dependencies() {
-//     Get.lazyPut<HomeController>(
-//       () => HomeController(),
-//     );
-//   }
-// }

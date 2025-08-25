@@ -36,9 +36,30 @@ class PenugasanGuruController extends GetxController {
     daftarKelas.assignAll(snapshot.docs);
   }
 
+  // Future<void> _fetchDaftarGuru() async {
+  //   final snapshot = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('pegawai').where('role', whereIn: ['Guru Kelas', 'Guru Mapel']).get();
+  //   daftarGuru.assignAll(snapshot.docs.map((doc) => {'uid': doc.id, 'nama': doc.data()['nama'] as String? ?? '?'}).toList());
+  // }
+
   Future<void> _fetchDaftarGuru() async {
-    final snapshot = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('pegawai').where('role', whereIn: ['Guru Kelas', 'Guru Mapel']).get();
-    daftarGuru.assignAll(snapshot.docs.map((doc) => {'uid': doc.id, 'nama': doc.data()['nama'] as String? ?? '?'}).toList());
+    final snapshot = await _firestore
+        .collection('Sekolah').doc(configC.idSekolah)
+        .collection('pegawai')
+        .where('role', whereIn: ['Guru Kelas', 'Guru Mapel'])
+        .get();
+        
+    daftarGuru.assignAll(snapshot.docs.map((doc) {
+      final data = doc.data();
+      final nama = data['nama'] as String? ?? '?';
+      final alias = data['alias'] as String?;
+
+      return {
+        'uid': doc.id,
+        'nama': nama,
+        // --- [IMPLEMENTASI LOGIKA FALLBACK] ---
+        'alias': (alias == null || alias.isEmpty) ? nama : alias,
+      };
+    }).toList());
   }
 
   Future<void> gantiKelasTerpilih(DocumentSnapshot kelasDoc) async {
@@ -63,6 +84,32 @@ class PenugasanGuruController extends GetxController {
     return _firestore.collection('Sekolah').doc(configC.idSekolah).collection('tahunajaran').doc(tahunAjaranAktif).collection('penugasan').doc(kelasTerpilih.value!.id).collection('matapelajaran').snapshots();
   }
 
+  // Future<void> assignGuruToMapel(Map<String, dynamic> guru, Map<String, dynamic> mapel) async {
+  //   if (kelasTerpilih.value == null) return;
+  //   Get.dialog(const Center(child: CircularProgressIndicator()), barrierDismissible: false);
+  //   try {
+  //     final kelasId = kelasTerpilih.value!.id;
+  //     final guruId = guru['uid'];
+  //     final mapelId = mapel['idMapel'];
+
+  //     final dataToSave = {
+  //       'idGuru': guruId, 'guru': guru['nama'], 'idMapel': mapelId, 'namamatapelajaran': mapel['nama'], 'idKelas': kelasId, 'idTahunAjaran': tahunAjaranAktif,
+  //     };
+
+  //     final penugasanRef = _firestore.collection('Sekolah').doc(configC.idSekolah).collection('tahunajaran').doc(tahunAjaranAktif).collection('penugasan').doc(kelasId).collection('matapelajaran').doc(mapelId);
+  //     final pegawaiJadwalRef = _firestore.collection('Sekolah').doc(configC.idSekolah).collection('pegawai').doc(guruId).collection('jadwal_mengajar').doc(tahunAjaranAktif);
+
+  //     WriteBatch batch = _firestore.batch();
+  //     batch.set(penugasanRef, dataToSave);
+  //     batch.set(pegawaiJadwalRef.collection('mapel_diampu').doc(mapelId), dataToSave);
+  //     batch.set(pegawaiJadwalRef, {'tahunAjaran': tahunAjaranAktif}, SetOptions(merge: true));
+  //     await batch.commit();
+      
+  //     Get.back();
+  //   } catch (e) { Get.back(); Get.snackbar('Gagal', e.toString()); }
+  // }
+
+
   Future<void> assignGuruToMapel(Map<String, dynamic> guru, Map<String, dynamic> mapel) async {
     if (kelasTerpilih.value == null) return;
     Get.dialog(const Center(child: CircularProgressIndicator()), barrierDismissible: false);
@@ -71,9 +118,17 @@ class PenugasanGuruController extends GetxController {
       final guruId = guru['uid'];
       final mapelId = mapel['idMapel'];
 
+      // --- [PERBAIKAN STRUKTUR DATA] ---
       final dataToSave = {
-        'idGuru': guruId, 'guru': guru['nama'], 'idMapel': mapelId, 'namamatapelajaran': mapel['nama'], 'idKelas': kelasId, 'idTahunAjaran': tahunAjaranAktif,
+        'idGuru': guruId,
+        'namaGuru': guru['nama'], // Simpan nama lengkap
+        'aliasGuru': guru['alias'], // Simpan juga aliasnya
+        'idMapel': mapelId,
+        'namamatapelajaran': mapel['nama'],
+        'idKelas': kelasId,
+        'idTahunAjaran': tahunAjaranAktif,
       };
+      // ------------------------------------
 
       final penugasanRef = _firestore.collection('Sekolah').doc(configC.idSekolah).collection('tahunajaran').doc(tahunAjaranAktif).collection('penugasan').doc(kelasId).collection('matapelajaran').doc(mapelId);
       final pegawaiJadwalRef = _firestore.collection('Sekolah').doc(configC.idSekolah).collection('pegawai').doc(guruId).collection('jadwal_mengajar').doc(tahunAjaranAktif);

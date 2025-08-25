@@ -40,7 +40,8 @@ class PenugasanGuruView extends GetView<PenugasanGuruController> {
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4.0),
               child: Obx(() {
-                final isSelected = controller.kelasTerpilih.value == namaKelas;
+                final isSelected = controller.kelasTerpilih.value?.id == kelasDoc.id;
+                // -----------------------------------------------------------------
                 return ChoiceChip(
                   label: Text(namaKelas),
                   selected: isSelected,
@@ -68,7 +69,14 @@ class PenugasanGuruView extends GetView<PenugasanGuruController> {
         stream: controller.getAssignedMapelStream(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-          final assignedMapelData = { for (var doc in snapshot.data?.docs ?? []) doc.id: doc.data()['guru'] };
+          
+          // --- [PERBAIKAN KRUSIAL] ---
+          // Sekarang kita mengambil 'aliasGuru' dengan fallback ke 'namaGuru'
+          final assignedMapelData = { 
+            for (var doc in snapshot.data?.docs ?? []) 
+              doc.id: doc.data()['aliasGuru'] ?? doc.data()['namaGuru']
+          };
+          // --- AKHIR PERBAIKAN ---
 
           return ListView.builder(
             padding: const EdgeInsets.all(12.0),
@@ -82,7 +90,12 @@ class PenugasanGuruView extends GetView<PenugasanGuruController> {
                margin: const EdgeInsets.only(bottom: 12.0),
                child: ListTile(
                 title: Text(mapel['nama'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text( guruDitugaskan != null ? 'Guru: $guruDitugaskan' : 'Belum ada guru', style: TextStyle(color: guruDitugaskan != null ? Colors.indigo : Colors.grey)),
+                  // --- [PERBAIKAN UI] Tampilkan nama guru (alias) secara langsung ---
+                  subtitle: Text(
+                    guruDitugaskan ?? 'Belum ada guru', // Simpel dan bersih
+                    style: TextStyle(color: guruDitugaskan != null ? Colors.indigo : Colors.grey)
+                  ),
+                  // ------------------------------------------------------------------
                     trailing: guruDitugaskan != null 
                     ? IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => controller.removeGuruFromMapel(mapelId))
                     : ElevatedButton(child: const Text('Atur Guru'), onPressed: () => _showGuruSelectionDialog(mapel)),
@@ -94,6 +107,7 @@ class PenugasanGuruView extends GetView<PenugasanGuruController> {
       );
     });
   }
+
   
   void _showGuruSelectionDialog(Map<String, dynamic> mapel) {
     // Reset state setiap kali dialog dibuka

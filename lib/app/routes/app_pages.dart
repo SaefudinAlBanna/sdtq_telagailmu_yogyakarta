@@ -72,6 +72,10 @@ import '../modules/jurnal_harian_guru/bindings/jurnal_harian_guru_binding.dart';
 import '../modules/jurnal_harian_guru/views/jurnal_harian_guru_view.dart';
 import '../modules/kelompok_halaqoh/bindings/kelompok_halaqoh_binding.dart';
 import '../modules/kelompok_halaqoh/views/kelompok_halaqoh_view.dart';
+import '../modules/laporan_akademik/bindings/laporan_akademik_binding.dart';
+import '../modules/laporan_akademik/views/laporan_akademik_view.dart';
+import '../modules/laporan_halaqah/bindings/laporan_halaqah_binding.dart';
+import '../modules/laporan_halaqah/views/laporan_halaqah_view.dart';
 import '../modules/laporan_jurnal_kelas/bindings/laporan_jurnal_kelas_binding.dart';
 import '../modules/laporan_jurnal_kelas/views/laporan_jurnal_kelas_view.dart';
 import '../modules/laporan_jurnal_pribadi/bindings/laporan_jurnal_pribadi_binding.dart';
@@ -98,10 +102,14 @@ import '../modules/pembayaran_spp/bindings/pembayaran_spp_binding.dart';
 import '../modules/pembayaran_spp/views/pembayaran_spp_view.dart';
 import '../modules/pemberian_kelas_siswa/bindings/pemberian_kelas_siswa_binding.dart';
 import '../modules/pemberian_kelas_siswa/views/pemberian_kelas_siswa_view.dart';
+import '../modules/pengaturan_bobot_nilai/bindings/pengaturan_bobot_nilai_binding.dart';
+import '../modules/pengaturan_bobot_nilai/views/pengaturan_bobot_nilai_view.dart';
 import '../modules/penugasan_guru/bindings/penugasan_guru_binding.dart';
 import '../modules/penugasan_guru/views/penugasan_guru_view.dart';
 import '../modules/perangkat_ajar/bindings/perangkat_ajar_binding.dart';
 import '../modules/perangkat_ajar/views/perangkat_ajar_view.dart';
+import '../modules/profile/bindings/profile_binding.dart';
+import '../modules/profile/views/profile_view.dart';
 import '../modules/prota_prosem/bindings/prota_prosem_binding.dart';
 import '../modules/prota_prosem/views/prota_prosem_view.dart';
 import '../modules/pusat_informasi_penggantian/bindings/pusat_informasi_penggantian_binding.dart';
@@ -435,6 +443,26 @@ class AppPages {
       name: _Paths.MODUL_AJAR_FORM,
       page: () => const ModulAjarFormView(),
       binding: ModulAjarFormBinding(),
+    ),
+    GetPage(
+      name: _Paths.PROFILE,
+      page: () => const ProfileView(),
+      binding: ProfileBinding(),
+    ),
+    GetPage(
+      name: _Paths.PENGATURAN_BOBOT_NILAI,
+      page: () => const PengaturanBobotNilaiView(),
+      binding: PengaturanBobotNilaiBinding(),
+    ),
+    GetPage(
+      name: _Paths.LAPORAN_AKADEMIK,
+      page: () => const LaporanAkademikView(),
+      binding: LaporanAkademikBinding(),
+    ),
+    GetPage(
+      name: _Paths.LAPORAN_HALAQAH,
+      page: () => const LaporanHalaqahView(),
+      binding: LaporanHalaqahBinding(),
     ),
   ];
 }
