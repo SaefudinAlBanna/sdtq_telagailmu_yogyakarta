@@ -32,7 +32,9 @@ class EkskulPendaftaranManagementView extends GetView<EkskulPendaftaranManagemen
       children: [
         const Text("Saat ini tidak ada periode pendaftaran ekskul yang aktif. Silakan buka pendaftaran baru.", textAlign: TextAlign.center),
         const SizedBox(height: 24),
-        TextField(controller: controller.judulC, decoration: const InputDecoration(labelText: "Judul Pendaftaran", border: OutlineInputBorder())),
+        TextField(controller: controller.judulC, 
+        decoration: const InputDecoration(labelText: "Judul Pendaftaran", 
+        border: OutlineInputBorder())),
         const SizedBox(height: 16),
         OutlinedButton.icon(
           onPressed: () => controller.pickDateRange(context),

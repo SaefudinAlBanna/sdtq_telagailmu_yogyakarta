@@ -36,7 +36,14 @@ migrate_working_dir/
 .pub/
 /build/
 firebase_options.dart
-android/app/google-services.json
+/android/app/google-services.json
+/android/key.properties
+/android/app/upload-keystore-baru.jks
+
+# Signing keys
+*.jks
+*.keystore
+key.properties
 
 # Symbolication related
 app.*.symbols

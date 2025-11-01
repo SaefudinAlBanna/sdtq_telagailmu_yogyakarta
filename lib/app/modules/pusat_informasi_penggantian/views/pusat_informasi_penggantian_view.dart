@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:sdtq_telagailmu_yogyakarta/app/models/info_penggantian_model.dart';
+import '../../../routes/app_pages.dart';
 import '../controllers/pusat_informasi_penggantian_controller.dart';
 
 class PusatInformasiPenggantianView extends GetView<PusatInformasiPenggantianController> {
@@ -21,6 +22,19 @@ class PusatInformasiPenggantianView extends GetView<PusatInformasiPenggantianCon
             Tab(text: "Terencana (Rentang Waktu)"),
           ],
         ),
+        actions: [
+          if (controller.dashC.isPimpinan)
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.menu),
+            tooltip: "Editor Jadwal",
+            onSelected: (value) {
+              if (value == 'Atur_Pengganti') {Get.toNamed(Routes.ATUR_PENGGANTIAN_HOST);}
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'Atur_Pengganti', child: ListTile(leading: Icon(Icons.change_circle_outlined), title: Text("Atur Pengganti Guru"))),
+            ],
+          ),
+        ],
       ),
       body: TabBarView(
         controller: controller.tabController,

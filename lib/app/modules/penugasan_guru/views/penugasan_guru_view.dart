@@ -123,7 +123,7 @@ class PenugasanGuruView extends GetView<PenugasanGuruController> {
             searchFieldProps: TextFieldProps(decoration: InputDecoration(hintText: "Cari guru..."))
           ),
           items: (f, cs) => controller.daftarGuru,
-          itemAsString: (guru) => guru['nama'],
+          itemAsString: (guru) => guru['alias'],
           compareFn: (item1, item2) => item1['uid'] == item2['uid'],
           
           // onChanged HANYA MENGUBAH STATE, TIDAK MENUTUP DIALOG

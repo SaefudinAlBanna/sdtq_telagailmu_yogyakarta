@@ -10,7 +10,7 @@ class LaporanHalaqahView extends GetView<LaporanHalaqahController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Laporan Halaqah (Mata Elang)")),
+      appBar: AppBar(title: const Text("Laporan Halaqah (Pantau)")),
       body: Obx(() {
         if (controller.isLoading.value) {
           return const Center(child: CircularProgressIndicator());

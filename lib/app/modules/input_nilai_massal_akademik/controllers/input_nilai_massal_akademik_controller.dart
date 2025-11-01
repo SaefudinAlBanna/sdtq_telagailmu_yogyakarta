@@ -3,12 +3,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:sdtq_telagailmu_yogyakarta/app/controllers/auth_controller.dart';
 import 'package:sdtq_telagailmu_yogyakarta/app/controllers/config_controller.dart';
 import 'package:sdtq_telagailmu_yogyakarta/app/models/siswa_model.dart';
+
+import '../../manajemen_tugas/controllers/manajemen_tugas_controller.dart';
 
 class InputNilaiMassalAkademikController extends GetxController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final ConfigController configC = Get.find<ConfigController>();
+  final AuthController _authController = Get.find<AuthController>();
 
   // --- DATA KONTEKS DARI ARGUMEN ---
   late String idKelas;
@@ -16,41 +20,50 @@ class InputNilaiMassalAkademikController extends GetxController {
   late String namaMapel;
   late String judulTugas;
   late String kategoriTugas;
+  String? idTugasUlangan;
 
   // --- STATE UI ---
   final isLoading = true.obs;
   final isSaving = false.obs;
 
   // --- STATE DATA & FORM ---
-  final daftarSiswa = <SiswaModel>[].obs; // Sumber data utama
-  final filteredSiswa = <SiswaModel>[].obs; // Untuk ditampilkan di UI
+  final daftarSiswa = <SiswaModel>[].obs;
+  final filteredSiswa = <SiswaModel>[].obs;
   final textControllers = <String, TextEditingController>{}.obs;
-  final absentStudents = <String>{}.obs; // RxSet untuk efisiensi
+  final absentStudents = <String>{}.obs;
   final searchController = TextEditingController();
+
+  late String idGuruPencatat;
+  late String namaGuruPencatat;
+  late String aliasGuruPencatat;
 
   @override
   void onInit() {
     super.onInit();
-    // 1. Ambil semua data argumen yang dibutuhkan
     final args = Get.arguments as Map<String, dynamic>? ?? {};
     idKelas = args['idKelas'] ?? '';
     idMapel = args['idMapel'] ?? '';
     namaMapel = args['namaMapel'] ?? '';
     judulTugas = args['judulTugas'] ?? 'Tugas';
     kategoriTugas = args['kategoriTugas'] ?? 'Harian/PR';
+    idTugasUlangan = args['idTugasUlangan'];
 
-    // 2. Tambahkan listener untuk fungsionalitas pencarian reaktif
-    searchController.addListener(() {
-      filterSiswa(searchController.text);
+    idGuruPencatat = _authController.auth.currentUser!.uid;
+    namaGuruPencatat = configC.infoUser['nama'] ?? 'Guru Tidak Dikenal';
+    aliasGuruPencatat = configC.infoUser['alias'] ?? namaGuruPencatat;
+
+    searchController.addListener(() => filterSiswa(searchController.text));
+
+    ever(configC.isUserDataReady, (isReady) {
+      if (isReady) _fetchSiswaAndPrepareForm();
     });
-
-    // 3. Mulai proses ambil data siswa
-    _fetchSiswaAndPrepareForm();
+    if (configC.isUserDataReady.value) {
+      _fetchSiswaAndPrepareForm();
+    }
   }
-  
+
   @override
   void onClose() {
-    // 4. PENTING: Hapus semua controller untuk mencegah memory leak
     searchController.dispose();
     for (var controller in textControllers.values) {
       controller.dispose();
@@ -62,42 +75,77 @@ class InputNilaiMassalAkademikController extends GetxController {
     isLoading.value = true;
     try {
       final String tahunAjaran = configC.tahunAjaranAktif.value;
-      final String semester = configC.semesterAktif.value;
+      if (tahunAjaran.isEmpty || tahunAjaran.contains("TIDAK")) {
+        throw Exception("Tahun ajaran tidak aktif.");
+      }
 
-      // Ambil UID semua siswa di kelas tersebut
-      final snapshot = await _firestore
+      // 1. Ambil daftar siswa dari kelas
+      final siswaSnap = await _firestore
           .collection('Sekolah').doc(configC.idSekolah)
           .collection('tahunajaran').doc(tahunAjaran)
           .collection('kelastahunajaran').doc(idKelas)
-          .collection('semester').doc(semester)
-          .collection('daftarsiswa').get();
+          .collection('daftarsiswa')
+          .orderBy('namaLengkap')
+          .get();
       
-      final List<String> siswaUIDs = snapshot.docs.map((doc) => doc.data()['uid'] as String).toList();
+      final List<String> siswaUIDs = siswaSnap.docs.map((doc) => doc.id).toList();
       
-      // Ambil data detail siswa menggunakan `whereIn` untuk efisiensi
-      if (siswaUIDs.isNotEmpty) {
-        final siswaSnapshot = await _firestore
-            .collection('Sekolah').doc(configC.idSekolah)
-            .collection('siswa').where(FieldPath.documentId, whereIn: siswaUIDs).get();
-        
-        final allSiswa = siswaSnapshot.docs.map((doc) => SiswaModel.fromFirestore(doc)).toList();
-        allSiswa.sort((a, b) => a.namaLengkap.compareTo(b.namaLengkap)); // Urutkan berdasarkan nama
-
-        daftarSiswa.assignAll(allSiswa);
-        filteredSiswa.assignAll(allSiswa);
-
-        // Siapkan TextEditingController untuk setiap siswa
-        for (var siswa in daftarSiswa) {
-          textControllers[siswa.uid] = TextEditingController();
-        }
-      } else {
+      if (siswaUIDs.isEmpty) {
         daftarSiswa.clear();
         filteredSiswa.clear();
+        isLoading.value = false;
+        return;
+      }
+        
+      final siswaDetailSnap = await _firestore
+          .collection('Sekolah').doc(configC.idSekolah)
+          .collection('siswa').where(FieldPath.documentId, whereIn: siswaUIDs).get();
+      
+      final allSiswa = siswaDetailSnap.docs.map((doc) => SiswaModel.fromFirestore(doc)).toList();
+      allSiswa.sort((a, b) => a.namaLengkap.compareTo(b.namaLengkap));
+
+      daftarSiswa.assignAll(allSiswa);
+      filteredSiswa.assignAll(allSiswa);
+
+      // 2. Siapkan text controller untuk setiap siswa
+      for (var siswa in daftarSiswa) {
+        textControllers[siswa.uid] = TextEditingController();
+      }
+
+      // 3. Jika ini adalah penilaian untuk tugas spesifik, ambil nilai terakhir
+      if (idTugasUlangan != null) {
+        final Map<String, int> nilaiTerakhirSiswa = {};
+
+        // Query untuk setiap siswa untuk mendapatkan nilai terakhirnya untuk tugas ini
+        for (final siswa in daftarSiswa) {
+          final nilaiSnap = await _firestore
+              .collection('Sekolah').doc(configC.idSekolah)
+              .collection('tahunajaran').doc(tahunAjaran)
+              .collection('kelastahunajaran').doc(idKelas)
+              .collection('daftarsiswa').doc(siswa.uid)
+              .collection('semester').doc(configC.semesterAktif.value)
+              .collection('matapelajaran').doc(idMapel)
+              .collection('nilai_harian')
+              .where('idTugasUlangan', isEqualTo: idTugasUlangan)
+              .orderBy('tanggal', descending: true)
+              .limit(1)
+              .get();
+          
+          if (nilaiSnap.docs.isNotEmpty) {
+            nilaiTerakhirSiswa[siswa.uid] = nilaiSnap.docs.first.data()['nilai'] as int;
+          }
+        }
+
+        // 4. Isi text controller dengan nilai yang sudah ada
+        for (var siswa in daftarSiswa) {
+          if (nilaiTerakhirSiswa.containsKey(siswa.uid)) {
+            textControllers[siswa.uid]?.text = nilaiTerakhirSiswa[siswa.uid].toString();
+          }
+        }
       }
 
     } catch (e) {
-      print(e);
-      Get.snackbar("Error", "Gagal memuat daftar siswa: ${e.toString()}");
+      Get.snackbar("Error", "Gagal memuat data siswa: ${e.toString()}");
     } finally {
       isLoading.value = false;
     }
@@ -123,54 +171,60 @@ class InputNilaiMassalAkademikController extends GetxController {
   Future<void> simpanNilaiMassal() async {
     isSaving.value = true;
     final WriteBatch batch = _firestore.batch();
-    final List<String> errorMessages = [];
-    int validGradesCount = 0;
+    int validGradesCount = 0; 
 
     try {
-      // Loop melalui SEMUA siswa, bukan yang difilter
       for (final siswa in daftarSiswa) {
-        // Lewati siswa yang ditandai absen
-        if (absentStudents.contains(siswa.uid)) continue;
+        if (absentStudents.contains(siswa.uid)) continue; 
 
         final controller = textControllers[siswa.uid];
-        final nilaiString = controller?.text.trim();
+        final nilaiString = controller?.text.trim();  
 
-        // Lewati jika input nilai kosong
-        if (nilaiString == null || nilaiString.isEmpty) continue;
+        if (nilaiString == null || nilaiString.isEmpty) continue; 
 
-        final int? nilai = int.tryParse(nilaiString);
+        final int? nilai = int.tryParse(nilaiString); 
 
-        // Validasi nilai
         if (nilai == null || nilai < 0 || nilai > 100) {
-          errorMessages.add("Nilai untuk ${siswa.namaLengkap} tidak valid (harus 0-100).");
-          continue; // Lanjut ke siswa berikutnya
-        }
+          Get.snackbar("Input Tidak Valid", "Nilai untuk ${siswa.namaLengkap} tidak valid (harus 0-100).");
+          isSaving.value = false;
+          return;
+        } 
 
-        // Jika lolos validasi, tambahkan operasi ke batch
-        validGradesCount++;
+        validGradesCount++; 
 
-        // A. Tambahkan dokumen nilai harian
-        final nilaiRef = _firestore
+        final siswaMapelRef = _firestore
             .collection('Sekolah').doc(configC.idSekolah)
             .collection('tahunajaran').doc(configC.tahunAjaranAktif.value)
             .collection('kelastahunajaran').doc(idKelas)
-            .collection('semester').doc(configC.semesterAktif.value)
             .collection('daftarsiswa').doc(siswa.uid)
-            .collection('matapelajaran').doc(idMapel)
-            .collection('nilai_harian').doc(); // Buat ID baru
-            
-        batch.set(nilaiRef, {
-          'kategori': kategoriTugas,
-          'nilai': nilai,
-          'catatan': judulTugas,
-          'tanggal': Timestamp.now(),
-        });
+            .collection('semester').doc(configC.semesterAktif.value)
+            .collection('matapelajaran').doc(idMapel);
+        
+        batch.set(siswaMapelRef, {
+          'idMapel': idMapel, 'namaMapel': namaMapel, 'idGuru': idGuruPencatat,
+          'namaGuru': namaGuruPencatat, 'aliasGuruPencatatAkhir': aliasGuruPencatat,
+        }, SetOptions(merge: true));  
 
-        // B. Tambahkan notifikasi untuk orang tua
-        final siswaDocRef = _firestore
-            .collection('Sekolah').doc(configC.idSekolah)
-            .collection('siswa').doc(siswa.uid);
-            
+        final nilaiRef = siswaMapelRef.collection('nilai_harian').doc(); 
+        
+        // [PERBAIKAN KUNCI DI SINI] Tambahkan semua field yang dibutuhkan
+        batch.set(nilaiRef, {
+          'kategori': kategoriTugas, 
+          'nilai': nilai, 
+          'catatan': judulTugas,
+          'tanggal': Timestamp.now(), 
+          'idGuruPencatat': idGuruPencatat,
+          'namaGuruPencatat': namaGuruPencatat, 
+          'aliasGuruPencatat': aliasGuruPencatat,
+          'idTugasUlangan': idTugasUlangan,
+          'idSekolah': configC.idSekolah,
+          'idMapel': idMapel,
+          'kelasId': idKelas,
+          'semester': int.parse(configC.semesterAktif.value),
+        }); 
+
+        final siswaDocRef = _firestore.collection('Sekolah').doc(configC.idSekolah).collection('siswa').doc(siswa.uid);
+        
         final notifRef = siswaDocRef.collection('notifikasi').doc();
         batch.set(notifRef, {
           'judul': 'Nilai Baru: $namaMapel',
@@ -178,31 +232,38 @@ class InputNilaiMassalAkademikController extends GetxController {
           'tipe': 'NILAI_MAPEL',
           'tanggal': FieldValue.serverTimestamp(),
           'isRead': false,
-        });
+          'idSekolah': configC.idSekolah,
+        }); 
 
         final metaRef = siswaDocRef.collection('notifikasi_meta').doc('metadata');
-        batch.set(metaRef, {'unreadCount': FieldValue.increment(1)}, SetOptions(merge: true));
-      }
+        batch.set(metaRef, {'unreadCount': FieldValue.increment(1), 'idSekolah': configC.idSekolah}, 
+        SetOptions(merge: true));
+      } 
 
-      // Cek hasil validasi sebelum commit
-      if (errorMessages.isNotEmpty) {
-        Get.snackbar("Input Tidak Valid", errorMessages.join("\n"),
-            backgroundColor: Colors.red, colorText: Colors.white, duration: const Duration(seconds: 5));
-        return;
-      }
-      
       if (validGradesCount == 0) {
-        Get.snackbar("Informasi", "Tidak ada nilai yang diinput untuk disimpan.");
+        Get.snackbar("Informasi", "Tidak ada nilai baru yang diinput untuk disimpan.",
+          backgroundColor: Colors.blueAccent, colorText: Colors.white,
+        );
+        isSaving.value = false;
         return;
-      }
+      } 
 
-      // Jika semua aman, eksekusi batch
       await batch.commit();
-      Get.back(); // Kembali ke halaman daftar siswa
-      Get.snackbar("Berhasil", "$validGradesCount nilai berhasil disimpan dan notifikasi terkirim.");
+      
+      if (Get.isRegistered<ManajemenTugasController>()) {
+        final mtController = Get.find<ManajemenTugasController>();
+        mtController.fetchTugas();
+      }
+      Get.back();   
+
+      Get.snackbar("Berhasil", "$validGradesCount nilai berhasil disimpan.",
+        backgroundColor: Colors.green, colorText: Colors.white,
+      );  
 
     } catch (e) {
-      Get.snackbar("Error", "Terjadi kesalahan saat menyimpan: ${e.toString()}");
+      Get.snackbar("Error", "Terjadi kesalahan saat menyimpan: ${e.toString()}",
+        backgroundColor: Colors.red, colorText: Colors.white,
+      );
     } finally {
       isSaving.value = false;
     }

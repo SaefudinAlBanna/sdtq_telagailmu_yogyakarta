@@ -1,21 +1,24 @@
+// lib/app/models/siswa_laporan_model.dart
+
 class SiswaLaporanModel {
   final String uid;
   final String nama;
   final String nisn;
   
-  // Hasil kalkulasi
-  final double nilaiAkhirRapor;
-  final double rataRataHarian;
-  final int nilaiPts;
-  final int nilaiPas;
+  // Metrik-metrik baru yang lebih kaya sesuai blueprint
+  double nilaiAkhirRapor;
+  double rataRataAbsensiKelas;
+  double rataRataAbsensiHalaqah;
+  int jumlahJurnalBelumDiisi;
 
   SiswaLaporanModel({
     required this.uid,
     required this.nama,
     required this.nisn,
-    required this.nilaiAkhirRapor,
-    required this.rataRataHarian,
-    required this.nilaiPts,
-    required this.nilaiPas,
+    // Inisialisasi dengan nilai default
+    this.nilaiAkhirRapor = 0.0,
+    this.rataRataAbsensiKelas = 0.0,
+    this.rataRataAbsensiHalaqah = 0.0,
+    this.jumlahJurnalBelumDiisi = 0,
   });
 }

@@ -2,12 +2,16 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:sdtq_telagailmu_yogyakarta/app/controllers/auth_controller.dart';
-import 'package:sdtq_telagailmu_yogyakarta/app/controllers/config_controller.dart';
-import 'package:sdtq_telagailmu_yogyakarta/app/models/jurnal_laporan_item_model.dart';
-import '../../../services/pdf_export_service.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import '../../../controllers/auth_controller.dart';
+import '../../../controllers/config_controller.dart';
+import '../../../models/jurnal_laporan_item_model.dart';
+import '../../../services/pdf_helper_service.dart';
 
 class LaporanJurnalPribadiController extends GetxController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -99,17 +103,51 @@ class LaporanJurnalPribadiController extends GetxController {
     Get.dialog(const Center(child: CircularProgressIndicator()), barrierDismissible: false);
     
     try {
-      final pdfService = PdfExportService();
-      await pdfService.generateAndPreviewPdf(
-        judulLaporan: "Laporan Jurnal Mengajar Pribadi",
-        rentangTanggal: "${DateFormat('dd MMM yyyy', 'id_ID').format(tanggalMulai.value)} - ${DateFormat('dd MMM yyyy', 'id_ID').format(tanggalSelesai.value)}",
+      // [PERBAIKAN #1] Muat semua aset di awal
+      final doc = pw.Document();
+      final boldFont = await PdfGoogleFonts.poppinsBold();
+      final logoImage = pw.MemoryImage((await rootBundle.load('assets/png/logo.png')).buffer.asUint8List());
+      final regularFont = await PdfGoogleFonts.poppinsRegular();
+      
+      // Ambil info sekolah dari Firestore (asumsi ada di dokumen /pengaturan/info_sekolah)
+      // Ini adalah contoh, sesuaikan path jika perlu
+      final infoSekolahDoc = await _firestore.collection('Sekolah').doc(configC.idSekolah).get();
+      final infoSekolah = infoSekolahDoc.data() ?? {};
+      
+      final rentangTanggal = "${DateFormat('dd MMM yyyy', 'id_ID').format(tanggalMulai.value)} - ${DateFormat('dd MMM yyyy', 'id_ID').format(tanggalSelesai.value)}";
+      
+      final content = await PdfHelperService.buildJurnalReportContent(
         laporanData: daftarLaporan,
-        isLaporanPimpinan: false, // Penting!
+        isLaporanPimpinan: false,
       );
+
+      doc.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          // [PERBAIKAN #2] Panggil header secara sinkronus dengan parameter
+          header: (context) => PdfHelperService.buildHeaderA4(infoSekolah: infoSekolah, logoImage: logoImage, boldFont: boldFont, regularFont: regularFont,),
+          footer: (context) => PdfHelperService.buildFooter(context, regularFont),
+          build: (context) => [
+            // ... sisa kode build tidak berubah
+            pw.SizedBox(height: 20), // Beri jarak dari header
+            pw.Text("Laporan Jurnal Mengajar Pribadi", style: pw.TextStyle(font: boldFont, fontSize: 14), textAlign: pw.TextAlign.center),
+            pw.Text("Periode: $rentangTanggal", style: const pw.TextStyle(fontSize: 10), textAlign: pw.TextAlign.center),
+            pw.SizedBox(height: 20),
+            ...content,
+          ],
+        ),
+      );
+
+      await Printing.sharePdf(
+        bytes: await doc.save(),
+        filename: 'jurnal_pribadi_${configC.infoUser['alias']}_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.pdf'
+      );
+
     } catch (e) {
       Get.snackbar("Error", "Gagal membuat PDF: $e");
     } finally {
-      Get.back(); // Tutup dialog loading
+      Get.back();
     }
   }
 }

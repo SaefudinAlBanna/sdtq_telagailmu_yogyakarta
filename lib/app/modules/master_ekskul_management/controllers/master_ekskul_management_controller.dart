@@ -7,9 +7,12 @@ import 'package:sdtq_telagailmu_yogyakarta/app/controllers/config_controller.dar
 import 'package:sdtq_telagailmu_yogyakarta/app/models/ekskul_model.dart';
 import 'package:sdtq_telagailmu_yogyakarta/app/routes/app_pages.dart';
 
+import '../../../controllers/dashboard_controller.dart';
+
 class MasterEkskulManagementController extends GetxController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final ConfigController configC = Get.find<ConfigController>();
+  final DashboardController dashC = Get.find<DashboardController>();
 
   Stream<QuerySnapshot<Map<String, dynamic>>> streamEkskul() {
     return _firestore

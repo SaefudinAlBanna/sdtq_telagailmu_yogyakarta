@@ -181,8 +181,10 @@ class PemberianKelasSiswaView extends GetView<PemberianKelasSiswaController> {
                 itemCount: filteredGuru.length,
                 itemBuilder: (context, index) {
                   final PegawaiModel guru = filteredGuru[index];
+                  final namaTampilan = (guru.alias == null || guru.alias!.isEmpty) ? guru.nama : guru.alias!;
                   return ListTile(
-                    title: Text(guru.nama),
+                    // title: Text(guru.nama),
+                    title: Text(namaTampilan),
                     subtitle: Text(guru.role?.displayName ?? ''),
                     onTap: () => controller.assignWaliKelas(guru),
                   );

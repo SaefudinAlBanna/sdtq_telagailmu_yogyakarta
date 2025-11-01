@@ -67,7 +67,7 @@ class PegawaiView extends GetView<PegawaiController> {
                         ? Text(pegawai.nama.substring(0, 1))
                         : null,
                   ),
-                  title: Text(pegawai.nama, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  title: Text(pegawai.alias ?? pegawai.nama, style: const TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Text(pegawai.role.displayName),
                   trailing: (controller.canManagePegawai)
                       ? Row(

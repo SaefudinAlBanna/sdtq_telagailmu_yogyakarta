@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:sdtq_telagailmu_yogyakarta/app/models/absensi_rekap_model.dart';
 import '../controllers/rekap_absensi_controller.dart';
 
 class RekapAbsensiView extends GetView<RekapAbsensiController> {
@@ -13,13 +12,20 @@ class RekapAbsensiView extends GetView<RekapAbsensiController> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Rekapitulasi Absensi'),
+        actions: [
+          Obx(() => controller.isProcessingPdf.value
+              ? const Padding(padding: EdgeInsets.all(16.0), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white)))
+              : IconButton(
+                  icon: const Icon(Icons.print_outlined),
+                  onPressed: controller.exportPdf,
+                  tooltip: "Cetak Laporan Absensi",
+                ),
+          ),
+        ],
       ),
       body: Column(
         children: [
-          // Filter Section
           _buildFilterSection(context),
-          
-          // Content Section
           Expanded(
             child: Obx(() {
               if (controller.selectedKelasId.value == null && controller.scope.value == 'sekolah') {
@@ -28,21 +34,41 @@ class RekapAbsensiView extends GetView<RekapAbsensiController> {
               if (controller.isLoading.value) {
                 return const Center(child: CircularProgressIndicator());
               }
-              if (controller.rekapData.isEmpty) {
-                return const Center(child: Text("Tidak ada data absensi pada rentang tanggal ini."));
+              // [PERBAIKAN] Gunakan rekapDataHarian untuk mengecek data
+              if (controller.rekapDataHarian.isEmpty) {
+                return const Center(child: Text("Tidak ada data absensi pada periode ini."));
               }
+              // [PEROMBAKAN TOTAL TAMPILAN KONTEN]
               return Column(
                 children: [
-                  _buildTotalRekapSection(),
-                  const Divider(thickness: 1),
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: controller.rekapData.length,
-                      itemBuilder: (context, index) {
-                        final rekapHarian = controller.rekapData[index];
-                        return _buildRekapHarianItem(rekapHarian);
-                      },
+                  _buildTotalRekapSection(), // Tetap menampilkan total
+                  const Divider(thickness: 1, height: 1),
+                  
+                  // Judul baru untuk rincian per siswa
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text("Rincian Ketidakhadiran per Siswa", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
+                  ),
+
+                  // Tampilkan daftar rincian per siswa
+                  Expanded(
+                    child: Obx(() {
+                      if (controller.rekapPerSiswa.isEmpty) {
+                        return const Center(child: Text("Semua siswa hadir selama periode ini."));
+                      }
+                      return ListView.separated(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: controller.rekapPerSiswa.length,
+                        separatorBuilder: (context, index) => const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final siswaRekap = controller.rekapPerSiswa[index];
+                          return _buildSiswaRekapItem(siswaRekap);
+                        },
+                      );
+                    }),
                   ),
                 ],
               );
@@ -52,41 +78,89 @@ class RekapAbsensiView extends GetView<RekapAbsensiController> {
       ),
     );
   }
+  
+  // [WIDGET BARU] Untuk menampilkan rincian per siswa
+  Widget _buildSiswaRekapItem(SiswaAbsensiRekap siswaRekap) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(vertical: 4),
+      title: Text(siswaRekap.nama, style: const TextStyle(fontWeight: FontWeight.w500)),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (siswaRekap.sakit > 0) Chip(label: Text("S: ${siswaRekap.sakit}"), backgroundColor: Colors.orange.shade100),
+          if (siswaRekap.izin > 0) const SizedBox(width: 4),
+          if (siswaRekap.izin > 0) Chip(label: Text("I: ${siswaRekap.izin}"), backgroundColor: Colors.blue.shade100),
+          if (siswaRekap.alfa > 0) const SizedBox(width: 4),
+          if (siswaRekap.alfa > 0) Chip(label: Text("A: ${siswaRekap.alfa}"), backgroundColor: Colors.red.shade100),
+        ],
+      ),
+    );
+  }
+
+  // ... (sisa widget tidak berubah, hanya widget _buildRekapHarianItem yang dihapus)
 
   Widget _buildFilterSection(BuildContext context) {
+    final months = List.generate(12, (index) {
+      return DropdownMenuItem(
+        value: index + 1,
+        child: Text(DateFormat('MMMM', 'id_ID').format(DateTime(0, index + 1))),
+      );
+    });
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          // Filter Kelas (hanya untuk pimpinan)
           if (controller.scope.value == 'sekolah')
             Obx(() => DropdownButtonFormField<String>(
               value: controller.selectedKelasId.value,
               hint: const Text("Pilih Kelas"),
-              items: controller.daftarKelas.map((doc) {
-                final id = doc.id;
-                final nama = (doc.data() as Map<String, dynamic>)['namaKelas'] ?? 'Tanpa Nama';
-                return DropdownMenuItem(value: id, child: Text(nama));
+              items: controller.daftarKelas.map((kelasData) {
+                final id = kelasData['id'];
+                final nama = kelasData['nama'];
+                return DropdownMenuItem(value: id, child: Text(nama!));
               }).toList(),
               onChanged: (value) {
-                if (value != null) {
-                  controller.selectedKelasId.value = value;
-                  controller.fetchRekapData();
-                }
+                if (value != null) controller.selectedKelasId.value = value;
               },
               decoration: const InputDecoration(border: OutlineInputBorder()),
             )),
           const SizedBox(height: 12),
           
-          // Filter Tanggal
-          OutlinedButton.icon(
-            onPressed: () => controller.pickDateRange(context),
-            icon: const Icon(Icons.calendar_month_outlined),
-            label: Obx(() => Text(
-              "${DateFormat('dd MMM yyyy').format(controller.startDate.value)} - ${DateFormat('dd MMM yyyy').format(controller.endDate.value)}",
-            )),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 40),
+          Row(
+            children: [
+              Expanded(
+                flex: 2,
+                child: Obx(() => DropdownButtonFormField<int>(
+                  value: controller.selectedMonth.value,
+                  items: months,
+                  onChanged: (val) {
+                    if (val != null) controller.selectedMonth.value = val;
+                  },
+                  decoration: const InputDecoration(border: OutlineInputBorder()),
+                )),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                flex: 1,
+                child: Obx(() => DropdownButtonFormField<int>(
+                  value: controller.selectedYear.value,
+                  items: controller.availableYears.map((y) => DropdownMenuItem(value: y, child: Text(y.toString()))).toList(),
+                  onChanged: (val) {
+                    if (val != null) controller.selectedYear.value = val;
+                  },
+                  decoration: const InputDecoration(border: OutlineInputBorder()),
+                )),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: controller.fetchRekapData,
+            icon: const Icon(Icons.search),
+            label: const Text("Tampilkan Data"),
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 48),
             ),
           )
         ],
@@ -115,26 +189,6 @@ class RekapAbsensiView extends GetView<RekapAbsensiController> {
         Text(value.toString(), style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color)),
         Text(label, style: TextStyle(fontSize: 14, color: color)),
       ],
-    );
-  }
-
-  Widget _buildRekapHarianItem(AbsensiRekapModel rekap) {
-    final rekapSiswa = rekap.siswa;
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: ExpansionTile(
-        title: Text(DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(rekap.tanggal.toDate())),
-        subtitle: Text("H:${rekap.rekap['hadir']} S:${rekap.rekap['sakit']} I:${rekap.rekap['izin']} A:${rekap.rekap['alfa']}"),
-        children: rekapSiswa.entries.map((entry) {
-          final detail = entry.value;
-          return ListTile(
-            dense: true,
-            leading: CircleAvatar(radius: 12, child: Text(detail['status'])),
-            title: Text(detail['nama']),
-            subtitle: Text(detail['keterangan'] ?? 'Tidak ada keterangan'),
-          );
-        }).toList(),
-      ),
     );
   }
 }

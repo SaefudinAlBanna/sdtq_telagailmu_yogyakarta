@@ -90,7 +90,7 @@ class UpsertPegawaiController extends GetxController {
         // --- LOGIKA UPDATE ---
         final dataToUpdate = {
           'nama': namaC.text.trim(), 'jeniskelamin': jenisKelamin.value,
-          'alias': "${jenisKelamin.value == "Laki-Laki" ? "Ustadz" : "Ustazah"} ${namaC.text.trim()}",
+          'alias': "${jenisKelamin.value == "Laki-Laki" ? "Ustadz" : "Ustadzah"} ${namaC.text.trim()}",
           'role': jabatanTerpilih.value, 'tugas': tugasTerpilih.toList(),
         };
         await _firestore.collection("Sekolah").doc(configC.idSekolah).collection('pegawai').doc(_pegawaiToEdit!.uid).update(dataToUpdate);

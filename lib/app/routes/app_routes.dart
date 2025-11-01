@@ -8,7 +8,6 @@ abstract class Routes {
   static const LOGIN = _Paths.LOGIN;
   static const FORGOT_PASSWORD = _Paths.FORGOT_PASSWORD;
   static const NEW_PASSWORD = _Paths.NEW_PASSWORD;
-  static const PEMBAYARAN_SPP = _Paths.PEMBAYARAN_SPP;
   static const JADWAL_PELAJARAN = _Paths.JADWAL_PELAJARAN;
   static const BUAT_SARPRAS = _Paths.BUAT_SARPRAS;
   static const DATA_SARPRAS = _Paths.DATA_SARPRAS;
@@ -17,7 +16,6 @@ abstract class Routes {
   static const DAFTAR_SISWA_PERMAPEL = _Paths.DAFTAR_SISWA_PERMAPEL;
   static const KELOMPOK_HALAQOH = _Paths.KELOMPOK_HALAQOH;
   static const DAFTAR_NILAI = _Paths.DAFTAR_NILAI;
-  static const DETAIL_SISWA = _Paths.DETAIL_SISWA;
   static const DAFTAR_SISWA_PINDAH_HALAQOH = _Paths.DAFTAR_SISWA_PINDAH_HALAQOH;
   static const DETAIL_NILAI_HALAQOH = _Paths.DETAIL_NILAI_HALAQOH;
   static const INFO_SEKOLAH_DETAIL = _Paths.INFO_SEKOLAH_DETAIL;
@@ -71,6 +69,53 @@ abstract class Routes {
   static const PENGATURAN_BOBOT_NILAI = _Paths.PENGATURAN_BOBOT_NILAI;
   static const LAPORAN_AKADEMIK = _Paths.LAPORAN_AKADEMIK;
   static const LAPORAN_HALAQAH = _Paths.LAPORAN_HALAQAH;
+  static const MARKETPLACE = _Paths.MARKETPLACE;
+  static const PENGATURAN_AKADEMIK = _Paths.PENGATURAN_AKADEMIK;
+  static const PROSES_KENAIKAN_KELAS = _Paths.PROSES_KENAIKAN_KELAS;
+  static const ONBOARDING_SCHOOL = _Paths.ONBOARDING_SCHOOL;
+  static const MANAJEMEN_TUGAS = _Paths.MANAJEMEN_TUGAS;
+  static const PENGATURAN_BIAYA = _Paths.PENGATURAN_BIAYA;
+  static const BUAT_TAGIHAN_TAHUNAN = _Paths.BUAT_TAGIHAN_TAHUNAN;
+  static const DETAIL_KEUANGAN_SISWA = _Paths.DETAIL_KEUANGAN_SISWA;
+  static const CARI_SISWA_KEUANGAN = _Paths.CARI_SISWA_KEUANGAN;
+  static const MANAJEMEN_PENAWARAN_BUKU = _Paths.MANAJEMEN_PENAWARAN_BUKU;
+  static const CREATE_EDIT_BUKU = _Paths.CREATE_EDIT_BUKU;
+  static const MANAJEMEN_PENDAFTARAN_BUKU = _Paths.MANAJEMEN_PENDAFTARAN_BUKU;
+  static const LAPORAN_KEUANGAN = _Paths.LAPORAN_KEUANGAN;
+  static const RINCIAN_TUNGGAKAN = _Paths.RINCIAN_TUNGGAKAN;
+  static const MANAJEMEN_KOMITE = _Paths.MANAJEMEN_KOMITE;
+  static const FINANCIAL_DASHBOARD_PIMPINAN =
+      _Paths.FINANCIAL_DASHBOARD_PIMPINAN;
+  static const LAPORAN_KOMITE_PIMPINAN = _Paths.LAPORAN_KOMITE_PIMPINAN;
+  static const HALAQAH_UMMI_MANAGEMENT = _Paths.HALAQAH_UMMI_MANAGEMENT;
+  static const CREATE_EDIT_HALAQAH_UMMI_GROUP =
+      _Paths.CREATE_EDIT_HALAQAH_UMMI_GROUP;
+  static const HALAQAH_UMMI_DASHBOARD_PENGAMPU =
+      _Paths.HALAQAH_UMMI_DASHBOARD_PENGAMPU;
+  static const HALAQAH_UMMI_GRADING = _Paths.HALAQAH_UMMI_GRADING;
+  static const HALAQAH_UMMI_RIWAYAT_PENGAMPU =
+      _Paths.HALAQAH_UMMI_RIWAYAT_PENGAMPU;
+  static const HALAQAH_UMMI_GRADING_MASSAL = _Paths.HALAQAH_UMMI_GRADING_MASSAL;
+  static const HALAQAH_UMMI_MANAJEMEN_PENGUJI =
+      _Paths.HALAQAH_UMMI_MANAJEMEN_PENGUJI;
+  static const HALAQAH_UMMI_DASHBOARD_KOORDINATOR =
+      _Paths.HALAQAH_UMMI_DASHBOARD_KOORDINATOR;
+  static const HALAQAH_UMMI_JADWAL_PENGUJI = _Paths.HALAQAH_UMMI_JADWAL_PENGUJI;
+  static const HALAQAH_UMMI_SET_PENGGANTI = _Paths.HALAQAH_UMMI_SET_PENGGANTI;
+  static const PENGATURAN_ALASAN_KEUANGAN = _Paths.PENGATURAN_ALASAN_KEUANGAN;
+  static const LAPORAN_PERUBAHAN_UP = _Paths.LAPORAN_PERUBAHAN_UP;
+  static const PINDAH_SISWA_HALAQAH = _Paths.PINDAH_SISWA_HALAQAH;
+  static const PRINTER_SETTINGS = _Paths.PRINTER_SETTINGS;
+  static const ALOKASI_PEMBAYARAN = _Paths.ALOKASI_PEMBAYARAN;
+  static const MANAJEMEN_DASHBOARD = _Paths.MANAJEMEN_DASHBOARD;
+  static const CATATAN_BK = _Paths.CATATAN_BK;
+  static const CATATAN_BK_LIST = _Paths.CATATAN_BK_LIST;
+  static const CATATAN_BK_DETAIL = _Paths.CATATAN_BK_DETAIL;
+  static const DASHBOARD_BK = _Paths.DASHBOARD_BK;
+  static const MANAJEMEN_TUNGGAKAN_AWAL = _Paths.MANAJEMEN_TUNGGAKAN_AWAL;
+  static const MANAJEMEN_KATEGORI_KEUANGAN = _Paths.MANAJEMEN_KATEGORI_KEUANGAN;
+  static const LAPORAN_KEUANGAN_SEKOLAH = _Paths.LAPORAN_KEUANGAN_SEKOLAH;
+  static const MANAJEMEN_ANGGARAN = _Paths.MANAJEMEN_ANGGARAN;
 }
 
 abstract class _Paths {
@@ -80,7 +125,6 @@ abstract class _Paths {
   static const LOGIN = '/login';
   static const FORGOT_PASSWORD = '/forgot-password';
   static const NEW_PASSWORD = '/new-password';
-  static const PEMBAYARAN_SPP = '/pembayaran-spp';
   static const JADWAL_PELAJARAN = '/jadwal-pelajaran';
   static const BUAT_SARPRAS = '/buat-sarpras';
   static const DATA_SARPRAS = '/data-sarpras';
@@ -89,7 +133,6 @@ abstract class _Paths {
   static const DAFTAR_SISWA_PERMAPEL = '/daftar-siswa-permapel';
   static const KELOMPOK_HALAQOH = '/kelompok-halaqoh';
   static const DAFTAR_NILAI = '/daftar-nilai';
-  static const DETAIL_SISWA = '/detail-siswa';
   static const DAFTAR_SISWA_PINDAH_HALAQOH = '/daftar-siswa-pindah-halaqoh';
   static const DETAIL_NILAI_HALAQOH = '/detail-nilai-halaqoh';
   static const INFO_SEKOLAH_DETAIL = '/info-sekolah-detail';
@@ -142,4 +185,49 @@ abstract class _Paths {
   static const PENGATURAN_BOBOT_NILAI = '/pengaturan-bobot-nilai';
   static const LAPORAN_AKADEMIK = '/laporan-akademik';
   static const LAPORAN_HALAQAH = '/laporan-halaqah';
+  static const MARKETPLACE = '/marketplace';
+  static const PENGATURAN_AKADEMIK = '/pengaturan-akademik';
+  static const PROSES_KENAIKAN_KELAS = '/proses-kenaikan-kelas';
+  static const ONBOARDING_SCHOOL = '/onboarding-school';
+  static const MANAJEMEN_TUGAS = '/manajemen-tugas';
+  static const PENGATURAN_BIAYA = '/pengaturan-biaya';
+  static const BUAT_TAGIHAN_TAHUNAN = '/buat-tagihan-tahunan';
+  static const DETAIL_KEUANGAN_SISWA = '/detail-keuangan-siswa';
+  static const CARI_SISWA_KEUANGAN = '/cari-siswa-keuangan';
+  static const MANAJEMEN_PENAWARAN_BUKU = '/manajemen-penawaran-buku';
+  static const CREATE_EDIT_BUKU = '/create-edit-buku';
+  static const MANAJEMEN_PENDAFTARAN_BUKU = '/manajemen-pendaftaran-buku';
+  static const LAPORAN_KEUANGAN = '/laporan-keuangan';
+  static const RINCIAN_TUNGGAKAN = '/rincian-tunggakan';
+  static const MANAJEMEN_KOMITE = '/manajemen-komite';
+  static const FINANCIAL_DASHBOARD_PIMPINAN = '/financial-dashboard-pimpinan';
+  static const LAPORAN_KOMITE_PIMPINAN = '/laporan-komite-pimpinan';
+  static const HALAQAH_UMMI_MANAGEMENT = '/halaqah-ummi-management';
+  static const CREATE_EDIT_HALAQAH_UMMI_GROUP =
+      '/create-edit-halaqah-ummi-group';
+  static const HALAQAH_UMMI_DASHBOARD_PENGAMPU =
+      '/halaqah-ummi-dashboard-pengampu';
+  static const HALAQAH_UMMI_GRADING = '/halaqah-ummi-grading';
+  static const HALAQAH_UMMI_RIWAYAT_PENGAMPU = '/halaqah-ummi-riwayat-pengampu';
+  static const HALAQAH_UMMI_GRADING_MASSAL = '/halaqah-ummi-grading-massal';
+  static const HALAQAH_UMMI_MANAJEMEN_PENGUJI =
+      '/halaqah-ummi-manajemen-penguji';
+  static const HALAQAH_UMMI_DASHBOARD_KOORDINATOR =
+      '/halaqah-ummi-dashboard-koordinator';
+  static const HALAQAH_UMMI_JADWAL_PENGUJI = '/halaqah-ummi-jadwal-penguji';
+  static const HALAQAH_UMMI_SET_PENGGANTI = '/halaqah-ummi-set-pengganti';
+  static const PENGATURAN_ALASAN_KEUANGAN = '/pengaturan-alasan-keuangan';
+  static const LAPORAN_PERUBAHAN_UP = '/laporan-perubahan-up';
+  static const PINDAH_SISWA_HALAQAH = '/pindah-siswa-halaqah';
+  static const PRINTER_SETTINGS = '/printer-settings';
+  static const ALOKASI_PEMBAYARAN = '/alokasi-pembayaran';
+  static const MANAJEMEN_DASHBOARD = '/manajemen-dashboard';
+  static const CATATAN_BK = '/catatan-bk';
+  static const CATATAN_BK_LIST = '/catatan-bk-list';
+  static const CATATAN_BK_DETAIL = '/catatan-bk-detail';
+  static const DASHBOARD_BK = '/dashboard-bk';
+  static const MANAJEMEN_TUNGGAKAN_AWAL = '/manajemen-tunggakan-awal';
+  static const MANAJEMEN_KATEGORI_KEUANGAN = '/manajemen-kategori-keuangan';
+  static const LAPORAN_KEUANGAN_SEKOLAH = '/laporan-keuangan-sekolah';
+  static const MANAJEMEN_ANGGARAN = '/manajemen-anggaran';
 }

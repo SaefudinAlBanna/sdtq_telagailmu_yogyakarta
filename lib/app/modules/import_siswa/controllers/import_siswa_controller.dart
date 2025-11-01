@@ -133,6 +133,7 @@ class ImportSiswaController extends GetxController {
               "uid": uidSiswa, "nisn": nisn, "namaLengkap": nama, "email": emailSiswa, "spp": spp,
               "isProfileComplete": false, "mustChangePassword": true, "statusSiswa": "Aktif",
               "createdAt": FieldValue.serverTimestamp(), "createdBy": adminEmail,
+              'kelasId': null,
           };
           await _firestore.collection("Sekolah").doc(configC.idSekolah).collection('siswa').doc(uidSiswa).set(dataToSave);
           successCount.value++;

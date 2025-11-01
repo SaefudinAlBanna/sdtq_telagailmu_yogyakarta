@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:sdtq_telagailmu_yogyakarta/app/models/jadwal_tugas_item_model.dart';
+import '../../../models/jadwal_tugas_item_model.dart';
 import '../controllers/jurnal_harian_guru_controller.dart';
 
 class JurnalHarianGuruView extends GetView<JurnalHarianGuruController> {

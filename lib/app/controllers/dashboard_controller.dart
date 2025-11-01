@@ -1,13 +1,15 @@
 // lib/app/controllers/dashboard_controller.dart
 
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:sdtq_telagailmu_yogyakarta/app/controllers/config_controller.dart';
-import 'package:sdtq_telagailmu_yogyakarta/app/routes/app_pages.dart';
-// --- [PERBAIKAN KUNCI] Import dari lokasi yang BENAR ---
-import 'package:sdtq_telagailmu_yogyakarta/app/models/carousel_item_model.dart';
+
+import '../models/carousel_item_model.dart';
+import '../modules/home/pages/dashboard_page.dart';
+import '../routes/app_pages.dart';
+import 'config_controller.dart';
 
 class DashboardController extends GetxController {
   final ConfigController configC = Get.find<ConfigController>();
@@ -17,7 +19,12 @@ class DashboardController extends GetxController {
   final RxBool isCarouselLoading = true.obs;
   final RxList<CarouselItemModel> daftarCarousel = <CarouselItemModel>[].obs;
 
-  // --- SEMUA LOGIKA OTORISASI & NAVIGASI DASHBOARD PINDAH KE SINI ---
+  StreamSubscription? _infoDashboardSubscription;
+  final RxList<DocumentSnapshot> daftarInfoSekolah = <DocumentSnapshot>[].obs;
+
+  final RxList<Map<String, dynamic>> quickAccessMenus = <Map<String, dynamic>>[].obs;
+  final RxList<Map<String, dynamic>> additionalMenus = <Map<String, dynamic>>[].obs;
+
 
   bool get isPimpinan {
     final user = configC.infoUser;
@@ -25,8 +32,17 @@ class DashboardController extends GetxController {
     final role = user['role'] ?? '';
     final tugas = List<String>.from(user['tugas'] ?? []);
     final peranSistem = user['peranSistem'] ?? '';
-    return ['Kepala Sekolah', 'Koordinator Kurikulum'].contains(role) || 
-           tugas.contains('Koordinator Kurikulum') || 
+    return ['Kepala Sekolah', 'Koordinator Kurikulum', 'TU', 'Tata Usaha'].contains(role) || 
+           tugas.contains('Admin') || 
+           peranSistem == 'superadmin';
+  }
+
+  bool get isBendaharaOrPimpinan {
+    final user = configC.infoUser;
+    if (user.isEmpty) return false;
+    final role = user['role'] ?? '';
+    final peranSistem = user['peranSistem'] ?? '';
+    return ['Kepala Sekolah', 'Bendahara'].contains(role) || 
            peranSistem == 'superadmin';
   }
 
@@ -41,11 +57,22 @@ class DashboardController extends GetxController {
     final user = configC.infoUser;
     if (user.isEmpty) return false;
     final String peranSistem = user['peranSistem'] ?? '';
-    final String role = user['role'] ?? '';
+    // final String role = user['role'] ?? '';
     final List<String> tugas = List<String>.from(user['tugas'] ?? []);
-    final bool hasRequiredRole = ['Kepala Sekolah', 'TU', 'Tata Usaha', 'Admin'].contains(role);
-    final bool hasRequiredTugas = tugas.any((t) => ['Koordinator Halaqah Ikhwan', 'Koordinator Halaqah Akhwat', 'Koordinator Kurikulum'].contains(t));
-    return peranSistem == 'superadmin' || hasRequiredRole || hasRequiredTugas;
+    // final bool hasRequiredRole = ['Kepala Sekolah', 'TU', 'Tata Usaha', 'Admin'].contains(role);
+    final bool hasRequiredTugas = tugas.any((t) => ['Koordinator Halaqah Ikhwan', 'Koordinator Halaqah Akhwat', 'Koordinator Halaqah', 'Koordinator Kurikulum'].contains(t));
+    // return peranSistem == 'superadmin' || hasRequiredRole || hasRequiredTugas;
+    return peranSistem == 'superadmin' || hasRequiredTugas;
+  }
+
+  bool get isPengujiUmmi {
+    final user = configC.infoUser;
+    final List<String> tugas = List<String>.from(user['tugas'] ?? []);
+    if (user.isEmpty) return false;
+    // Kita akan membuat logic ini lebih dinamis nanti,
+    // untuk sekarang kita asumsikan pimpinan juga penguji
+    final bool hasRequiredTugas = tugas.any((t) => ['Koordinator Halaqah Ikhwan', 'Koordinator Halaqah Akhwat', 'Koordinator Halaqah'].contains(t));
+    return isBendaharaOrPimpinan || hasRequiredTugas; 
   }
 
   bool get isPengampuHalaqah {
@@ -70,32 +97,182 @@ class DashboardController extends GetxController {
     if (user.isEmpty) return false;
     final String peranSistem = user['peranSistem'] ?? '';
     final String role = user['role'] ?? '';
-    // Untuk saat ini, kita samakan dengan Pimpinan
     return ['Kepala Sekolah', 'Koordinator Kurikulum'].contains(role) || peranSistem == 'superadmin';
   }
+
+  bool get canManageKomite {
+    final user = configC.infoUser;
+    if (user.isEmpty) return false;
+    final String peran = user['role'] ?? '';
+    final String? kelasWali = user['waliKelasDari'] as String?;
+    final String? peranKomite = user['peranKomite']?['jabatan'] as String?;
+
+    return peran == 'Kepala Sekolah' || (kelasWali != null && kelasWali.isNotEmpty) || peranKomite == 'Ketua Komite Sekolah';
+  }
+
+  bool get isGuru {
+    final user = configC.infoUser;
+    if (user.isEmpty) return false;
+    final String role = user['role'] ?? '';
+    return ['Guru Kelas', 'Guru Mapel'].contains(role);
+  } 
+  
 
    @override
   void onReady() {
     super.onReady();
-    // Gunakan listener agar carousel auto-refresh jika config berubah (misal setelah login)
+    ever(configC.infoUser, (_) => _updateMenuLists());
     ever(configC.status, (AppStatus status) {
       if (status == AppStatus.authenticated) {
         fetchCarouselData();
+        _listenToInfoDashboard();
+        _updateMenuLists();
+      } else {
+        _infoDashboardSubscription?.cancel();
+        _infoDashboardSubscription = null;
+        daftarInfoSekolah.clear();
+        _updateMenuLists();
       }
     });
     if (configC.status.value == AppStatus.authenticated) {
       fetchCarouselData();
+      _listenToInfoDashboard();
+      _updateMenuLists();
     }
   }
 
+  @override
+  void onClose() {
+    _infoDashboardSubscription?.cancel();
+    super.onClose();
+  }
+
+  void _updateMenuLists() {
+
+    final bool canAccessBkDashboard = (configC.infoUser['waliKelasDari'] != null && (configC.infoUser['waliKelasDari'] as String).isNotEmpty) ||
+                                 ['Kepala Sekolah'].contains(configC.infoUser['role']) ||
+                                 (configC.infoUser['tugas'] as List? ?? []).contains('Kesiswaan');
+
+    quickAccessMenus.clear();
+    additionalMenus.clear();
+
+    if (kepalaSekolah) {
+        quickAccessMenus.add({'image': 'akademik_1.png', 'title': 'Laporan Akademik', 'route': Routes.LAPORAN_AKADEMIK});
+        quickAccessMenus.add({'image': 'akademik_2.png', 'title': 'Laporan Halaqah', 'route': Routes.LAPORAN_HALAQAH});
+        // quickAccessMenus.add({'image': 'akademik_2.png', 'title': 'Laporan Halaqah', 'route': Routes.HALAQAH_UMMI_DASHBOARD_KOORDINATOR});
+        quickAccessMenus.add({'image': 'papan_list.png', 'title': 'Rekap Absensi', 'onTap': goToRekapAbsensiSekolah});
+        quickAccessMenus.add({'image': 'kamera_layar.png', 'title': 'Jurnal Kelas', 'route': Routes.LAPORAN_JURNAL_KELAS});
+    } else {
+        quickAccessMenus.add({'image': 'daftar_tes.png', 'title': 'Guru Akademik', 'route': Routes.GURU_AKADEMIK});
+        quickAccessMenus.add({'image': 'daftar_tes.png', 'title': 'Dashboard Halaqah', 'onTap': goToHalaqahDashboard});
+        quickAccessMenus.add({'image': 'play.png', 'title': 'Jurnal Ajar', 'route': Routes.JURNAL_HARIAN_GURU});
+        quickAccessMenus.add({'image': 'jurnal_ajar.png', 'title': 'Jurnal Pribadi', 'route': Routes.LAPORAN_JURNAL_PRIBADI});
+    }
+
+    if (isBendaharaOrPimpinan) {
+      quickAccessMenus.add({'image': 'buku_uang.png', 'title': 'Pembayaran', 'route': Routes.CARI_SISWA_KEUANGAN});
+    } else if (isGuru) {
+      quickAccessMenus.add({'image': 'abc_papan.png', 'title': 'Perangkat Ajar', 'route': Routes.PERANGKAT_AJAR});
+    }
+
+    quickAccessMenus.add({'image': 'layar.png', 'title': 'Jadwal Pelajaran', 'route': Routes.JADWAL_PELAJARAN});
+    if (isBendaharaOrPimpinan) {
+    quickAccessMenus.add({'image': 'uang.png', 'title': 'Buku Besar', 'route': Routes.LAPORAN_KEUANGAN_SEKOLAH});
+    // quickAccessMenus.add({'image': 'uang.png', 'title': 'Kategori Keuangan', 'route': Routes.MANAJEMEN_KATEGORI_KEUANGAN});
+    } else {
+      quickAccessMenus.add({'image': 'kamera_layar.png', 'title': 'Master Ekskul', 'route': Routes.MANAJEMEN_KALENDER_AKADEMIK});
+    }
+    quickAccessMenus.add({'image': 'faq.png', 'title': 'Lainnya', 'onTap': () => _showAllMenusInView(Get.context!)});
+
+    if (canAccessBkDashboard) {
+      additionalMenus.add({'image': 'jurnal_ajar.png', 'title': 'Dashboard BK', 'route': Routes.DASHBOARD_BK});
+    }
+
+    if (canManageKbm) {
+      additionalMenus.add({'image': 'toga_lcd.png', 'title': 'Pemberian Kelas', 'route': Routes.PEMBERIAN_KELAS_SISWA});
+      additionalMenus.add({'image': 'akademik_1.png', 'title': 'Manajemen Buku', 'route': Routes.MANAJEMEN_PENAWARAN_BUKU});
+    }
+    if (canManageHalaqah) {
+    }
+    if (isPengujiUmmi) {
+      additionalMenus.add({'image': 'papan_list.png', 'title': 'Jadwal Ujian Ummi', 'route': Routes.HALAQAH_UMMI_JADWAL_PENGUJI});
+    }
+    additionalMenus.add({'image': 'daftar_list.png', 'title': 'Daftar Pegawai', 'route': Routes.PEGAWAI});
+    additionalMenus.add({'image': 'pengumuman.png', 'title': 'Info Sekolah', 'route': Routes.INFO_SEKOLAH});
+    // additionalMenus.add({'image': 'kamera_layar.png', 'title': 'Master Ekskul', 'route': Routes.MASTER_EKSKUL_MANAGEMENT});
+    if (isBendaharaOrPimpinan) {
+    additionalMenus.add({'image': 'akademik_2.png', 'title': 'Kalender Akademik', 'route': Routes.MANAJEMEN_KALENDER_AKADEMIK});
+    }
+    additionalMenus.add({'image': 'ktp.png', 'title': 'Laporan Pengganti', 'route': Routes.PUSAT_INFORMASI_PENGGANTIAN});
+    additionalMenus.add({'image': 'kamera_layar.png', 'title': 'Master Ekskul', 'route': Routes.MASTER_EKSKUL_MANAGEMENT});
+    if (kepalaSekolah) {
+      additionalMenus.add({'image': 'uang.png', 'title': 'Kategori', 'route': Routes.MANAJEMEN_KATEGORI_KEUANGAN});
+    }
+    // additionalMenus.add({'image': 'abc_papan.png', 'title': 'Perangkat Ajar', 'route': Routes.PERANGKAT_AJAR});
+    if (canManageKbm) {
+      additionalMenus.add({'image': 'emc2.png', 'title': 'Bobot Nilai', 'route': Routes.PENGATURAN_BOBOT_NILAI});
+    }
+    if (isPimpinan) {
+      additionalMenus.add({'image': 'pengumuman.png', 'title': 'Pengaturan Akademik', 'route': Routes.PENGATURAN_AKADEMIK});
+      // additionalMenus.add({'image': 'buku_uang.png', 'title': 'Pengaturan Biaya', 'route': Routes.PENGATURAN_AKADEMIK});
+    }
+    if (isBendaharaOrPimpinan) {
+    }
+
+    if (canManageKomite) {
+      additionalMenus.add({'image': 'ktp.png', 'title': 'Manajemen Komite', 'route': Routes.MANAJEMEN_KOMITE});
+    }
+  }
+
+  void _showAllMenusInView(BuildContext context) {
+    Get.bottomSheet(
+      Container(
+        height: MediaQuery.of(context).size.height * 0.4,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              width: 50, height: 5,
+              decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10)),
+            ),
+            const Text("Semua Menu", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            Expanded(
+              child: Obx(() => GridView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: additionalMenus.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 4, crossAxisSpacing: 16, mainAxisSpacing: 16,
+                ),
+                itemBuilder: (context, index) {
+                  final menu = additionalMenus[index];
+                  // [PERBAIKAN] Panggil static method dari DashboardView
+                  return DashboardView.buildMenuItem(
+                    imagePath: menu['image'],
+                    title: menu['title'],
+                    onTap: menu['route'] != null ? () => Get.toNamed(menu['route']) : menu['onTap'], // Use onTap if route is null
+                  );
+                },
+              )),
+            ),
+          ],
+        ),
+      ),
+      isScrollControlled: true,
+    );
+  }
+
+
   void showPesanEditorDialog() {
-    // Ambil data awal dari ConfigController untuk mengisi form
     final Map<String, dynamic> config = configC.konfigurasiDashboard;
     final _pesanPimpinanC = TextEditingController(text: config['pesanPimpinan']?['pesan'] ?? '');
     final _pesanLiburC = TextEditingController(text: config['pesanDefaultLibur'] ?? '');
     final _pesanSelesaiC = TextEditingController(text: config['pesanDefaultSetelahKBM'] ?? '');
     
-    // State khusus untuk dialog ini
     final Rx<DateTime> berlakuHingga = Rx<DateTime>((config['pesanPimpinan']?['berlakuHingga'] as Timestamp?)?.toDate() ?? DateTime.now());
     final RxBool isMenyimpan = false.obs;
 
@@ -130,7 +307,7 @@ class DashboardController extends GetxController {
                     lastDate: DateTime.now().add(const Duration(days: 30)),
                   );
                   if (picked != null) {
-                    berlakuHingga.value = DateTime(picked.year, picked.month, picked.day, 23, 59, 59); // Set ke akhir hari
+                    berlakuHingga.value = DateTime(picked.year, picked.month, picked.day, 23, 59, 59);
                   }
                 },
               )),
@@ -193,10 +370,9 @@ class DashboardController extends GetxController {
         'pesanDefaultSetelahKBM': pesanSelesai,
       }, SetOptions(merge: true));
 
-      Get.back(); // Tutup dialog
+      Get.back();
       Get.snackbar("Berhasil", "Pesan dasbor berhasil diperbarui.");
       
-      // Sinkronkan ulang config & carousel untuk refresh instan
       await configC.reloadKonfigurasiDashboard();
       await fetchCarouselData();
 
@@ -214,13 +390,14 @@ class DashboardController extends GetxController {
       final todayWithoutTime = DateTime(now.year, now.month, now.day);
       final String tahunAjaran = configC.tahunAjaranAktif.value;
       final String semester = configC.semesterAktif.value;
-      final String namaHari = DateFormat('EEEE', 'id_ID').format(now);
+      final String namaHari = DateFormat('EEEE', 'id_ID').format(now);  
 
       if (tahunAjaran.isEmpty || tahunAjaran.contains("TIDAK")) {
-        daftarCarousel.clear(); isCarouselLoading.value = false; return;
-      }
+        daftarCarousel.clear();
+        isCarouselLoading.value = false;
+        return;
+      } 
 
-      // --- [Prioritas #0: Pesan Pimpinan] ---
       final pesanPimpinan = configC.konfigurasiDashboard['pesanPimpinan'] as Map<String, dynamic>?;
       if (pesanPimpinan != null) {
         final berlakuHingga = (pesanPimpinan['berlakuHingga'] as Timestamp?)?.toDate();
@@ -228,111 +405,83 @@ class DashboardController extends GetxController {
           daftarCarousel.assignAll([ CarouselItemModel( namaKelas: "Semua Staf & Guru", tipe: CarouselContentType.Prioritas, judul: "PENGUMUMAN PENTING", isi: pesanPimpinan['pesan'] as String? ?? '', ikon: Icons.campaign_rounded, warna: Colors.red.shade700) ]);
           isCarouselLoading.value = false; return;
         }
-      }
+      } 
 
-      // --- [Prioritas #1: Kalender Akademik] ---
       final kalenderSnap = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('tahunajaran').doc(tahunAjaran).collection('kalender_akademik').where('tanggalMulai', isLessThanOrEqualTo: now).get();
       for (var doc in kalenderSnap.docs) {
         final data = doc.data();
         final tglSelesai = (data['tanggalSelesai'] as Timestamp).toDate();
         if (todayWithoutTime.isBefore(tglSelesai.add(const Duration(days: 1)))) {
           final isLibur = data['isLibur'] as bool? ?? false;
-          // --- [PERBAIKAN WARNA] ---
-          daftarCarousel.assignAll([ CarouselItemModel( namaKelas: "Info Sekolah", 
-          tipe: CarouselContentType.Info, judul: isLibur ? "HARI LIBUR" : "INFO KEGIATAN", 
-          isi: data['namaKegiatan'] as String? ?? 'Tanpa Judul', 
-          ikon: isLibur ? Icons.weekend_rounded : Icons.event_note_rounded, 
-          warna: isLibur ? Colors.red.shade400 : Colors.teal.shade700) ]);
+          daftarCarousel.assignAll([ CarouselItemModel( namaKelas: "Info Sekolah", tipe: CarouselContentType.Info, judul: isLibur ? "HARI LIBUR" : "INFO KEGIATAN", isi: data['namaKegiatan'] as String? ?? 'Tanpa Judul', ikon: isLibur ? Icons.weekend_rounded : Icons.event_note_rounded, warna: isLibur ? Colors.red.shade400 : Colors.teal.shade700) ]);
           isCarouselLoading.value = false; return;
+        }
+      } 
+
+      if (now.weekday == DateTime.saturday || now.weekday == DateTime.sunday) {
+        final String pesanLiburDariDb = configC.konfigurasiDashboard['pesanDefaultLibur'] as String? ?? "";
+        final String pesanLiburFinal = pesanLiburDariDb.trim().isEmpty ? "Tetap semangat belajar dan muroja'ah yaa.." : pesanLiburDariDb;
+        daftarCarousel.assignAll([ CarouselItemModel( namaKelas: "Info Sekolah", tipe: CarouselContentType.Default, judul: "SELAMAT BERAKHIR PEKAN", isi: pesanLiburFinal, ikon: Icons.beach_access_rounded, warna: Colors.blue.shade700) ]);
+        isCarouselLoading.value = false; return;
+      } 
+
+      final Map<String, Map<String, dynamic>?> petaAbsensiRekap = {};  
+
+      if (isPimpinan) {
+        try {
+          if (configC.infoUser.isEmpty) throw Exception("Profil belum siap.");
+          
+          final absensiRekapSnap = await _firestore.collection('Sekolah').doc(configC.idSekolah)
+              .collection('tahunajaran').doc(tahunAjaran)
+              .collection('kelastahunajaran').get()
+              .then((snap) => Future.wait(snap.docs.map((doc) => 
+                  doc.reference.collection('semester').doc(semester).collection('absensi').doc(DateFormat('yyyy-MM-dd').format(now)).get()
+              )));
+          
+          for (var doc in absensiRekapSnap) {
+            if (doc.exists) {
+              petaAbsensiRekap[doc.reference.parent!.parent!.id] = doc.data() as Map<String, dynamic>?;
+            }
+          }
+        } catch (e) {
+          print("Info: Pengambilan data rekap absensi kelas dilewati untuk peran ini atau karena error: $e");
         }
       }
 
-      // --- [Prioritas #2: Hari Libur (Sabtu/Minggu)] ---
-      if (now.weekday == DateTime.saturday || now.weekday == DateTime.sunday) {
-        final String pesanLiburDariDb = configC.konfigurasiDashboard['pesanDefaultLibur'] as String? ?? "";
-        final String pesanLiburFinal = pesanLiburDariDb.trim().isEmpty ? 
-        "Tetap semangat belajar dan muroja'ah yaa.." : pesanLiburDariDb;
-        // --- [PERBAIKAN WARNA] ---
-        daftarCarousel.assignAll([ CarouselItemModel( namaKelas: "Info Sekolah", tipe: CarouselContentType.Default, 
-        judul: "SELAMAT BERAKHIR PEKAN", isi: pesanLiburFinal, ikon: Icons.beach_access_rounded, 
-        warna: Colors.blue.shade700) ]);
-        isCarouselLoading.value = false; return;
-      }
-
-      // --- [Prioritas #3-#6: Logika KBM Hari Aktif (Dengan Arsitektur Peran)] ---
       final List<CarouselItemModel> carouselItems = [];
       final jadwalSnap = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('tahunajaran').doc(tahunAjaran).collection('jadwalkelas').get();
       final List<String> daftarKelas = jadwalSnap.docs.map((doc) => doc.id).toList()..sort();
-      final nowTime = DateFormat("HH:mm").parse(DateFormat("HH:mm").format(now));
+      final nowTime = DateFormat("HH:mm").parse(DateFormat("HH:mm").format(now)); 
 
-      // JALUR PIMPINAN: Mengambil data absensi
-      if (isPimpinan) {
-        final absensiSnap = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('tahunajaran').doc(tahunAjaran).collection('kelastahunajaran').get()
-            .then((snap) => Future.wait(snap.docs.map((doc) => doc.reference.collection('semester').doc(semester).collection('absensi').doc(DateFormat('yyyy-MM-dd').format(now)).get())));
-      final Map<String, Map<String, dynamic>?> petaAbsensi = {
-        for (var doc in absensiSnap)
-          if (doc.exists)
-            doc.reference.parent.parent!.parent.id: doc.data() as Map<String, dynamic>?
-      };
+      for (String idKelas in daftarKelas) {
+        final jadwalDoc = jadwalSnap.docs.firstWhere((doc) => doc.id == idKelas);
+        final jadwalData = jadwalDoc.data() as Map<String, dynamic>;
+        final listSlot = (jadwalData[namaHari] ?? jadwalData[namaHari.toLowerCase()]) as List? ?? [];
+        listSlot.sort((a,b) => (a['jam'] as String).compareTo(b['jam'] as String)); 
 
-        for (String idKelas in daftarKelas) {
-          final jadwalDoc = jadwalSnap.docs.firstWhere((doc) => doc.id == idKelas);
-          final jadwalData = jadwalDoc.data() as Map<String, dynamic>;
-          final listSlot = (jadwalData[namaHari] ?? jadwalData[namaHari.toLowerCase()]) as List? ?? [];
-          listSlot.sort((a,b) => (a['jam'] as String).compareTo(b['jam'] as String));
+        Map<String, dynamic>? slotBerlangsung;
+        Map<String, dynamic>? slotBerikutnya;
+        for (var slot in listSlot) { try { final timeParts = (slot['jam'] as String? ?? "00:00-00:00").split('-'); final startTime = DateFormat("HH:mm").parse(timeParts[0].trim()); final endTime = DateFormat("HH:mm").parse(timeParts[1].trim()); if (nowTime.isAtSameMomentAs(startTime) || (nowTime.isAfter(startTime) && nowTime.isBefore(endTime))) { slotBerlangsung = slot; break; } if (nowTime.isBefore(startTime) && slotBerikutnya == null) { slotBerikutnya = slot; } } catch(e) {} } 
 
-          Map<String, dynamic>? slotBerlangsung;
-          Map<String, dynamic>? slotBerikutnya;
-          for (var slot in listSlot) { try { final timeParts = (slot['jam'] as String? ?? "00:00-00:00").split('-'); final startTime = DateFormat("HH:mm").parse(timeParts[0].trim()); final endTime = DateFormat("HH:mm").parse(timeParts[1].trim()); if (nowTime.isAtSameMomentAs(startTime) || (nowTime.isAfter(startTime) && nowTime.isBefore(endTime))) { slotBerlangsung = slot; break; } if (nowTime.isBefore(startTime) && slotBerikutnya == null) { slotBerikutnya = slot; } } catch(e) {} }
-
-          CarouselItemModel itemForThisClass;
-          if (slotBerlangsung != null) {
-            itemForThisClass = CarouselItemModel(namaKelas: idKelas.split('-').first, tipe: CarouselContentType.KBM, judul: "Saat Ini Berlangsung", isi: slotBerlangsung['namaMapel'] ?? 'N/A', subJudul: "Oleh: ${slotBerlangsung['namaGuru'] ?? 'N/A'}", ikon: Icons.school_rounded, warna: Colors.indigo.shade700);
-          } else if (slotBerikutnya != null) {
-            itemForThisClass = CarouselItemModel(namaKelas: idKelas.split('-').first, tipe: CarouselContentType.KBM, judul: "Pelajaran Berikutnya", isi: slotBerikutnya['namaMapel'] ?? 'N/A', subJudul: "Jam: ${slotBerikutnya['jam'] ?? 'N/A'}", ikon: Icons.update_rounded, warna: Colors.blue.shade700);
+        CarouselItemModel itemForThisClass;
+        if (slotBerlangsung != null) {
+          itemForThisClass = CarouselItemModel(namaKelas: idKelas.split('-').first, tipe: CarouselContentType.KBM, judul: "Saat Ini Berlangsung", isi: slotBerlangsung['namaMapel'] ?? 'N/A', subJudul: "Oleh: ${slotBerlangsung['namaGuru'] ?? 'N/A'}", ikon: Icons.school_rounded, warna: Colors.indigo.shade700);
+        } else if (slotBerikutnya != null) {
+          itemForThisClass = CarouselItemModel(namaKelas: idKelas.split('-').first, tipe: CarouselContentType.KBM, judul: "Pelajaran Berikutnya", isi: slotBerikutnya['namaMapel'] ?? 'N/A', subJudul: "Jam: ${slotBerikutnya['jam'] ?? 'N/A'}", ikon: Icons.update_rounded, warna: Colors.blue.shade700);
+        } else {
+          final absensiData = petaAbsensiRekap[idKelas];
+          if (absensiData != null && absensiData['rekap'] != null) {
+            final rekap = absensiData['rekap'];
+            itemForThisClass = CarouselItemModel(namaKelas: idKelas.split('-').first, tipe: CarouselContentType.Info, judul: "Kehadiran Hari Ini", isi: "H:${rekap['hadir']??0}, S:${rekap['sakit']??0}, I:${rekap['izin']??0}, A:${rekap['alfa']??0}", ikon: Icons.checklist_rtl_rounded, warna: Colors.green.shade800);
           } else {
-            final absensiData = petaAbsensi[idKelas];
-            if (absensiData != null && absensiData['rekap'] != null) {
-              final rekap = absensiData['rekap'];
-              itemForThisClass = CarouselItemModel(namaKelas: idKelas.split('-').first, tipe: CarouselContentType.Info, judul: "Kehadiran Hari Ini", isi: "H:${rekap['hadir']??0}, S:${rekap['sakit']??0}, I:${rekap['izin']??0}, A:${rekap['alfa']??0}", ikon: Icons.checklist_rtl_rounded, warna: Colors.green.shade800);
-            } else {
-              final String pesanSelesaiDariDb = configC.konfigurasiDashboard['pesanDefaultSetelahKBM'] as String? ?? ""; 
-              final String pesanSelesaiFinal = pesanSelesaiDariDb.trim().isEmpty ? 
-              "Aktivitas belajar telah usai." : pesanSelesaiDariDb;
-              // --- [PERBAIKAN WARNA] ---
-              itemForThisClass = CarouselItemModel(namaKelas: idKelas.split('-').first, 
-              tipe: CarouselContentType.Default, judul: "KBM Selesai", isi: pesanSelesaiFinal, 
-              ikon: Icons.check_circle_outline_rounded, warna: Colors.blueGrey.shade700);
-            }
+            final String pesanSelesaiDariDb = configC.konfigurasiDashboard['pesanDefaultSetelahKBM'] as String? ?? ""; 
+            final String pesanSelesaiFinal = pesanSelesaiDariDb.trim().isEmpty ? "Untuk Ustadz/Ustadzah, Selamat Beristirahat" : pesanSelesaiDariDb;
+            itemForThisClass = CarouselItemModel(namaKelas: idKelas.split('-').first, tipe: CarouselContentType.Default, judul: "KBM Selesai", isi: pesanSelesaiFinal, ikon: Icons.check_circle_outline_rounded, warna: Colors.indigo.shade400);
           }
-          carouselItems.add(itemForThisClass);
         }
-      } 
-      // JALUR GURU BIASA: Tanpa data absensi
-      else {
-        for (String idKelas in daftarKelas) {
-          final jadwalDoc = jadwalSnap.docs.firstWhere((doc) => doc.id == idKelas);
-          final jadwalData = jadwalDoc.data() as Map<String, dynamic>;
-          final listSlot = (jadwalData[namaHari] ?? jadwalData[namaHari.toLowerCase()]) as List? ?? [];
-          listSlot.sort((a,b) => (a['jam'] as String).compareTo(b['jam'] as String));
-
-          Map<String, dynamic>? slotBerlangsung;
-          Map<String, dynamic>? slotBerikutnya;
-          for (var slot in listSlot) { try { final timeParts = (slot['jam'] as String? ?? "00:00-00:00").split('-'); final startTime = DateFormat("HH:mm").parse(timeParts[0].trim()); final endTime = DateFormat("HH:mm").parse(timeParts[1].trim()); if (nowTime.isAtSameMomentAs(startTime) || (nowTime.isAfter(startTime) && nowTime.isBefore(endTime))) { slotBerlangsung = slot; break; } if (nowTime.isBefore(startTime) && slotBerikutnya == null) { slotBerikutnya = slot; } } catch(e) {} }
-
-          CarouselItemModel itemForThisClass;
-          if (slotBerlangsung != null) {
-            itemForThisClass = CarouselItemModel(namaKelas: idKelas.split('-').first, tipe: CarouselContentType.KBM, judul: "Saat Ini Berlangsung", isi: slotBerlangsung['namaMapel'] ?? 'N/A', subJudul: "Oleh: ${slotBerlangsung['namaGuru'] ?? 'N/A'}", ikon: Icons.school_rounded, warna: Colors.indigo.shade700);
-          } else if (slotBerikutnya != null) {
-            itemForThisClass = CarouselItemModel(namaKelas: idKelas.split('-').first, tipe: CarouselContentType.KBM, judul: "Pelajaran Berikutnya", isi: slotBerikutnya['namaMapel'] ?? 'N/A', subJudul: "Jam: ${slotBerikutnya['jam'] ?? 'N/A'}", ikon: Icons.update_rounded, warna: Colors.blue.shade700);
-          } else {
-            final String pesanSelesaiDariDb = configC.konfigurasiDashboard['pesanDefaultSetelahKBM'] as String? ?? ""; final String pesanSelesaiFinal = pesanSelesaiDariDb.trim().isEmpty ? "Aktivitas belajar telah usai." : pesanSelesaiDariDb;
-            itemForThisClass = CarouselItemModel(namaKelas: idKelas.split('-').first, tipe: CarouselContentType.Default, judul: "KBM Selesai", isi: pesanSelesaiFinal, ikon: Icons.check_circle_outline_rounded, warna: Colors.grey.shade700);
-          }
-          carouselItems.add(itemForThisClass);
-        }
+        carouselItems.add(itemForThisClass);
       }
-      daftarCarousel.assignAll(carouselItems);
+      daftarCarousel.assignAll(carouselItems);  
 
     } catch (e) {
       print("### Gagal membangun carousel: $e");
@@ -342,31 +491,46 @@ class DashboardController extends GetxController {
     }
   }
 
+  void _listenToInfoDashboard() {
+    _infoDashboardSubscription?.cancel();
+    
+    final String tahunAjaran = configC.tahunAjaranAktif.value;
+    if (configC.status.value != AppStatus.authenticated || tahunAjaran.isEmpty || tahunAjaran.contains("TIDAK")) {
+      daftarInfoSekolah.clear();
+      _infoDashboardSubscription = null;
+      return;
+    }
+
+    _infoDashboardSubscription = _firestore.collection('Sekolah').doc(configC.idSekolah)
+        .collection('tahunajaran').doc(tahunAjaran)
+        .collection('info_sekolah')
+        .orderBy('timestamp', descending: true)
+        .limit(5)
+        .snapshots().listen((snapshot) {
+            daftarInfoSekolah.assignAll(snapshot.docs);
+        }, onError: (error) {
+            print("Error listening to info_sekolah stream in DashboardController: $error");
+            daftarInfoSekolah.clear();
+        });
+  }
+
+  void cancelDashboardStreams() {
+    _infoDashboardSubscription?.cancel();
+    _infoDashboardSubscription = null;
+    daftarInfoSekolah.clear();
+  }
 
   void goToEkskulPendaftaran() => Get.toNamed(Routes.EKSKUL_PENDAFTARAN_MANAGEMENT);
   
-  void goToHalaqahManagement() => Get.toNamed(Routes.HALAQAH_MANAGEMENT);
-  void goToHalaqahDashboard() => Get.toNamed(Routes.HALAQAH_DASHBOARD_PENGAMPU);
+  // void goToHalaqahManagement() => Get.toNamed(Routes.HALAQAH_MANAGEMENT); --> METODE AL-HUSNA
+  void goToHalaqahManagement() => Get.toNamed(Routes.HALAQAH_UMMI_MANAGEMENT); // --> METODE UMMI
+  void goToHalaqahDashboard() => Get.toNamed(Routes.HALAQAH_UMMI_DASHBOARD_PENGAMPU);
   
-  // Fungsi ini sekarang akan mengirim argumen dengan benar
   void goToRekapAbsensiSekolah() {
     Get.toNamed(Routes.REKAP_ABSENSI, arguments: {'scope': 'sekolah'});
   }
 
   void goToAturGuruPengganti() {
     Get.toNamed(Routes.ATUR_GURU_PENGGANTI);
-  }
-
-  Stream<QuerySnapshot<Map<String, dynamic>>> streamInfoDashboard() {
-    final String tahunAjaran = configC.tahunAjaranAktif.value;
-    if (tahunAjaran.isEmpty || tahunAjaran.contains("TIDAK")) {
-      return const Stream.empty();
-    }
-    return _firestore.collection('Sekolah').doc(configC.idSekolah)
-        .collection('tahunajaran').doc(tahunAjaran)
-        .collection('info_sekolah')
-        .orderBy('timestamp', descending: true)
-        .limit(5) // Ambil hanya 5 terbaru
-        .snapshots();
   }
 }

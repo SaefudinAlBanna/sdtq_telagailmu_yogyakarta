@@ -1,27 +1,36 @@
-// lib/app/modules/root/views/root_view.dart
+// lib/app/modules/root/views/root_view.dart (Aplikasi SEKOLAH)
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:sdtq_telagailmu_yogyakarta/app/controllers/config_controller.dart';
-import 'package:sdtq_telagailmu_yogyakarta/app/modules/home/views/home_view.dart';
-import 'package:sdtq_telagailmu_yogyakarta/app/modules/login/views/login_view.dart';
-import 'package:sdtq_telagailmu_yogyakarta/app/modules/new_password/views/new_password_view.dart';
+import '../controllers/root_controller.dart';
 
-class RootView extends GetView<ConfigController> {
+class RootView extends GetView<RootController> {
   const RootView({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() {
-      switch (controller.status.value) {
-        case AppStatus.loading:
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
-        case AppStatus.unauthenticated:
-          return const LoginView();
-        case AppStatus.needsNewPassword:
-          return const NewPasswordView();
-        case AppStatus.authenticated:
-          return const HomeView();
-      }
-    });
+    // RootView sekarang hanya akan menampilkan UI splash,
+    // dan RootController akan memutuskan ke mana harus pergi.
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              height: 120,
+              width: 120,
+              child: Image.asset("assets/png/logo.png"),
+            ),
+            SizedBox(height: 32),
+            CircularProgressIndicator(),
+            SizedBox(height: 24),
+            Text(
+              "Memverifikasi sesi...",
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

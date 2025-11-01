@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:persistent_bottom_nav_bar/persistent_bottom_nav_bar.dart';
+import '../../marketplace/views/marketplace_view.dart';
 import '../../profile/views/profile_view.dart';
 import '../controllers/home_controller.dart';
 import '../pages/dashboard_page.dart';
@@ -14,7 +15,7 @@ class HomeView extends StatelessWidget {
   List<Widget> _buildScreens() {
     return [
       const DashboardView(),
-      const PlaceholderView(pageTitle: "Jurnal"), // Ganti ini jika sudah ada
+      const MarketplaceView(), // Ganti ini jika sudah ada
       const ProfileView(),
     ];
   }
@@ -24,7 +25,10 @@ class HomeView extends StatelessWidget {
       PersistentBottomNavBarItem(
           icon: const Icon(Icons.dashboard_rounded), title: ("Dashboard"), activeColorPrimary: Colors.indigo, inactiveColorPrimary: Colors.grey),
       PersistentBottomNavBarItem(
-          icon: const Icon(Icons.book_rounded), title: ("Jurnal"), activeColorPrimary: Colors.indigo, inactiveColorPrimary: Colors.grey),
+          // Gunakan ikon yang lebih relevan
+          icon: const Icon(Icons.storefront_rounded), 
+          title: ("Marketplace"), // Sesuaikan judul
+          activeColorPrimary: Colors.indigo, inactiveColorPrimary: Colors.grey),
       PersistentBottomNavBarItem(
           icon: const Icon(Icons.person_rounded), title: ("Profil"), activeColorPrimary: Colors.indigo, inactiveColorPrimary: Colors.grey),
     ];

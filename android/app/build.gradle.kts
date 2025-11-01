@@ -1,15 +1,15 @@
 plugins {
     id("com.android.application")
-    // START: FlutterFire Configuration
     id("com.google.gms.google-services")
-    // END: FlutterFire Configuration
     id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+import java.util.Properties
+import java.io.FileInputStream
+
 android {
-    namespace = "com.sdtq_telagailmu_yogyakarta.sdtq_telagailmu_yogyakarta"
+    namespace = "com.unadigital.pkbmtelagailmuyogyakarta"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "27.0.12077973"
 
@@ -22,8 +22,26 @@ android {
         jvmTarget = JavaVersion.VERSION_11.toString()
     }
 
+    // Path yang sudah diperbaiki untuk membaca key.properties dari folder /android
+    val keystorePropertiesFile = rootProject.file("key.properties")
+    val keystoreProperties = Properties()
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+    }
+
+    signingConfigs {
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+            }
+        }
+    }
+
     defaultConfig {
-        applicationId = "com.sdtq_telagailmu_yogyakarta.sdtq_telagailmu_yogyakarta"
+        applicationId = "com.unadigital.pkbmtelagailmuyogyakarta"
         minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -39,7 +57,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug") // Ubah ke "release" jika sudah punya keystore produksi
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }
@@ -49,6 +67,8 @@ flutter {
 }
 
 dependencies {
+    implementation(platform("com.google.firebase:firebase-bom:34.2.0"))
     implementation("com.android.support:multidex:1.0.3")
     implementation("com.google.firebase:firebase-appcheck-debug:16.0.0-beta01")
+    implementation("com.google.firebase:firebase-analytics")
 }

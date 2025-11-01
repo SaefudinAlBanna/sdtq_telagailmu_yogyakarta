@@ -19,6 +19,8 @@ class ManajemenKalenderAkademikController extends GetxController {
   late final CollectionReference<Map<String, dynamic>> _acaraRef;
   StreamSubscription? _acaraSubscription;
 
+  final isLoading = true.obs; // [PERBAIKAN] Tambahkan deklarasi isLoading
+
   final RxMap<DateTime, List<AcaraKalender>> events = <DateTime, List<AcaraKalender>>{}.obs;
   final Rx<DateTime> focusedDay = DateTime.now().obs;
   final Rxn<DateTime> selectedDay = Rxn<DateTime>();
@@ -39,10 +41,18 @@ class ManajemenKalenderAkademikController extends GetxController {
     super.onInit();
     selectedDay.value = focusedDay.value;
     final String tahunAjaran = configC.tahunAjaranAktif.value;
-    _acaraRef = _firestore.collection('Sekolah').doc(configC.idSekolah)
-        .collection('tahunajaran').doc(tahunAjaran)
-        .collection('kalender_akademik');
-    _listenToEvents();
+    
+    // [PERBAIKAN] Pindah logika ini ke _initializeData atau _listenToEvents
+    // dan pastikan isLoading diatur dengan benar.
+    if (tahunAjaran.isNotEmpty && !tahunAjaran.contains("TIDAK")) {
+      _acaraRef = _firestore.collection('Sekolah').doc(configC.idSekolah)
+          .collection('tahunajaran').doc(tahunAjaran)
+          .collection('kalender_akademik');
+      _listenToEvents();
+    } else {
+      Get.snackbar("Peringatan", "Tahun ajaran aktif belum terdeteksi. Kalender mungkin tidak tampil.");
+      isLoading.value = false;
+    }
   }
 
   @override
@@ -54,6 +64,8 @@ class ManajemenKalenderAkademikController extends GetxController {
   }
 
   void _listenToEvents() {
+    // [PERBAIKAN] Pastikan isLoading diatur saat memulai dan mengakhiri loading data.
+    isLoading.value = true;
     _acaraSubscription = _acaraRef.snapshots().listen((snapshot) {
       final Map<DateTime, List<AcaraKalender>> tempEvents = {};
       for (var doc in snapshot.docs) {
@@ -68,6 +80,11 @@ class ManajemenKalenderAkademikController extends GetxController {
       }
       events.value = tempEvents;
       _updateMonthlyEvents();
+      isLoading.value = false; // Set false setelah data di-load
+    }, onError: (error) {
+      print("[ManajemenKalenderAkademikController] Error listening to events: $error");
+      Get.snackbar("Error", "Gagal memuat acara kalender: $error");
+      isLoading.value = false; // Set false juga jika ada error
     });
   }
 
@@ -104,15 +121,18 @@ class ManajemenKalenderAkademikController extends GetxController {
   String _colorToHex(Color color) => '#${color.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
 
   void showColorPickerDialog() {
-    Color pickerColor = warnaTerpilih.value;
+    final Rx<Color> dialogPickerColor = warnaTerpilih.value.obs; // Gunakan Rx<Color> sementara
     Get.dialog(
       AlertDialog(
         title: const Text('Pilih Warna Acara'),
-        content: SingleChildScrollView(
-          child: ColorPicker(pickerColor: pickerColor, onColorChanged: (color) => pickerColor = color),
-        ),
+        content: Obx(() => SingleChildScrollView( // Obx untuk rebuild saat warna berubah
+          child: ColorPicker(
+            pickerColor: dialogPickerColor.value,
+            onColorChanged: (color) => dialogPickerColor.value = color, // Perbarui Rx<Color>
+          ),
+        )),
         actions: [ ElevatedButton(child: const Text('Pilih'), onPressed: () {
-          warnaTerpilih.value = pickerColor;
+          warnaTerpilih.value = dialogPickerColor.value; // Assign nilai final
           Get.back();
         })],
       ),
@@ -196,7 +216,8 @@ class ManajemenKalenderAkademikController extends GetxController {
         "tanggalMulai": Timestamp.fromDate(tanggalMulai.value),
         "tanggalSelesai": Timestamp.fromDate(tanggalSelesai.value),
         "isLibur": isLibur.value, "warnaHex": _colorToHex(warnaTerpilih.value),
-        "dibuatOleh": configC.infoUser['uid'], "timestamp": FieldValue.serverTimestamp(),
+        "dibuatOleh": configC.infoUser['uid'], 
+        "timestamp": FieldValue.serverTimestamp(),
       };
 
       if (eventId == null) {
@@ -208,6 +229,7 @@ class ManajemenKalenderAkademikController extends GetxController {
       }
     } catch (e) {
       Get.snackbar("Error", "Gagal menyimpan acara: $e");
+      print("[ManajemenKalenderAkademikController] Error saving event: $e");
     } finally {
       isFormLoading.value = false;
     }
@@ -222,7 +244,10 @@ class ManajemenKalenderAkademikController extends GetxController {
         try {
           await _acaraRef.doc(eventId).delete();
           Get.snackbar("Berhasil", "Acara telah dihapus.");
-        } catch (e) { Get.snackbar("Error", "Gagal menghapus acara: $e"); }
+        } catch (e) { 
+          Get.snackbar("Error", "Gagal menghapus acara: $e");
+          print("[ManajemenKalenderAkademikController] Error deleting event: $e");
+        }
       },
     );
   }

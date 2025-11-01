@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../routes/app_pages.dart';
 import '../controllers/jadwal_pelajaran_controller.dart';
 
 class JadwalPelajaranView extends GetView<JadwalPelajaranController> {
@@ -11,10 +12,29 @@ class JadwalPelajaranView extends GetView<JadwalPelajaranController> {
       appBar: AppBar(
         title: Padding(
           padding: const EdgeInsets.only(top: 8),
-          child: const Text('Jadwal Pelajaran', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
+          child: Text('Jadwal Pelajaran', style: TextStyle(color: Colors.indigo.shade800, fontWeight: FontWeight.bold)),
         ),
         elevation: 0,
-        backgroundColor: Colors.indigo.shade800,
+        backgroundColor: Colors.grey.shade300,
+        actions: [
+          if (controller.dashC.isPimpinan)
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.menu),
+            tooltip: "Editor Jadwal",
+            onSelected: (value) {
+              if (value == 'Atur_JP') {Get.toNamed(Routes.MASTER_JAM);}
+              if (value == 'penugasan') {Get.toNamed(Routes.PENUGASAN_GURU);}
+              if (value == 'Master_Mapel') {Get.toNamed(Routes.MASTER_MAPEL);}
+              if (value == 'Edit_Jadwal') {Get.toNamed(Routes.EDITOR_JADWAL);}
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'Atur_JP', child: ListTile(leading: Icon(Icons.timer_sharp), title: Text("Atur JP"))),
+              const PopupMenuItem(value: 'penugasan', child: ListTile(leading: Icon(Icons.grading_rounded), title: Text("penugasan"))),
+              const PopupMenuItem(value: 'Master_Mapel', child: ListTile(leading: Icon(Icons.bookmark_add_outlined), title: Text("Master Mapel"))),
+              const PopupMenuItem(value: 'Edit_Jadwal', child: ListTile(leading: Icon(Icons.schedule_sharp), title: Text("Edit Jadwal"))),
+            ],
+          ),
+        ],
       ),
       body: Obx(() {
         if (controller.isLoading.value) {
@@ -38,7 +58,7 @@ class JadwalPelajaranView extends GetView<JadwalPelajaranController> {
   Widget _buildKelasSelector() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      color: Colors.indigo.shade800,
+      color: Colors.grey.shade300,
       child: Card(
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

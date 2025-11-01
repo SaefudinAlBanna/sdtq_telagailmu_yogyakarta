@@ -1,29 +1,33 @@
-// lib/app/modules/input_nilai_siswa/controllers/input_nilai_siswa_controller.dart (FINAL & TERINTEGRASI)
+// lib/app/modules/input_nilai_siswa/controllers/input_nilai_siswa_controller.dart
 
+import 'dart:async'; // Pastikan ini ada
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:sdtq_telagailmu_yogyakarta/app/controllers/auth_controller.dart';
 import 'package:sdtq_telagailmu_yogyakarta/app/controllers/config_controller.dart';
 import 'package:sdtq_telagailmu_yogyakarta/app/models/atp_model.dart';
 import 'package:sdtq_telagailmu_yogyakarta/app/models/nilai_harian_model.dart';
 import 'package:sdtq_telagailmu_yogyakarta/app/models/siswa_model.dart';
 
-class InputNilaiSiswaController extends GetxController {
+class InputNilaiSiswaController extends GetxController with GetTickerProviderStateMixin {
   final ConfigController configC = Get.find<ConfigController>();
+  final AuthController _authController = Get.find<AuthController>();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Data Konteks
-  late String idKelas, namaMapel, idMapel, idGuru, namaGuru;
+  late String idKelas, namaMapel, idMapel, idGuru, namaGuru; 
   late SiswaModel siswa;
   late String idTahunAjaran, semesterAktif;
   late DocumentReference siswaMapelRef;
 
-  // State UI
+  late String idGuruPencatat;
+  late String namaGuruPencatat;
+  late String aliasGuruPencatat;
+
   final isLoading = true.obs;
   final isSaving = false.obs;
   final RxBool isWaliKelas = false.obs;
 
-  // State Data Nilai
   final RxList<NilaiHarianModel> daftarNilaiHarian = <NilaiHarianModel>[].obs;
   final RxMap<String, int> bobotNilai = <String, int>{}.obs;
   final Rxn<int> nilaiPTS = Rxn<int>();
@@ -31,12 +35,10 @@ class InputNilaiSiswaController extends GetxController {
   final Rxn<double> nilaiAkhir = Rxn<double>();
   final RxList<Map<String, dynamic>> rekapNilaiMapelLain = <Map<String, dynamic>>[].obs;
 
-  // State Kurikulum Merdeka
   final Rxn<AtpModel> atpModel = Rxn<AtpModel>();
   final RxMap<String, String> capaianTpSiswa = <String, String>{}.obs;
   final TextEditingController deskripsiCapaianC = TextEditingController();
 
-  // State Form Dialog
   final TextEditingController nilaiC = TextEditingController();
   final TextEditingController catatanC = TextEditingController();
   final harianC = TextEditingController(), ulanganC = TextEditingController(), 
@@ -52,6 +54,8 @@ class InputNilaiSiswaController extends GetxController {
       return;
     }
     _initializeArguments();
+    // [PERBAIKAN]: Panggil inisialisasi data mapel siswa di sini
+    _initializeSiswaMapelData(); 
     loadInitialData();
   }
 
@@ -70,9 +74,30 @@ class InputNilaiSiswaController extends GetxController {
     siswaMapelRef = _firestore.collection('Sekolah').doc(configC.idSekolah)
       .collection('tahunajaran').doc(idTahunAjaran)
       .collection('kelastahunajaran').doc(idKelas)
-      .collection('semester').doc(semesterAktif)
       .collection('daftarsiswa').doc(siswa.uid)
+      .collection('semester').doc(semesterAktif)
       .collection('matapelajaran').doc(idMapel);
+    
+    idGuruPencatat = _authController.auth.currentUser!.uid;
+    namaGuruPencatat = configC.infoUser['nama'] ?? 'Guru Tidak Dikenal';
+    aliasGuruPencatat = configC.infoUser['alias'] ?? namaGuruPencatat;
+  }
+
+  // [BARU]: Fungsi untuk memastikan data dasar mata pelajaran siswa ada
+  Future<void> _initializeSiswaMapelData() async {
+    try {
+      await siswaMapelRef.set({
+        'idMapel': idMapel,
+        'namaMapel': namaMapel,
+        'idGuru': idGuru,
+        'namaGuru': namaGuru,
+        'aliasGuruPencatatAkhir': aliasGuruPencatat, // Menambahkan alias guru pengampu/pencatat terakhir
+        // Tambahkan field lain yang mungkin relevan secara default jika belum ada
+      }, SetOptions(merge: true));
+    } catch (e) {
+      print("### Error initializing siswa mapel data: $e");
+      Get.snackbar("Error", "Gagal menginisialisasi data mata pelajaran siswa. ${e.toString()}");
+    }
   }
 
   Future<void> loadInitialData() async {
@@ -91,7 +116,6 @@ class InputNilaiSiswaController extends GetxController {
   }
 
   Future<void> checkIsWaliKelas() async {
-    // Gunakan data dari ConfigController yang sudah ada & efisien
     if (configC.infoUser['kelasDiampu'] == idKelas) {
       isWaliKelas.value = true;
       fetchRekapNilaiMapelLain(); 
@@ -100,15 +124,12 @@ class InputNilaiSiswaController extends GetxController {
 
    Future<void> fetchRekapNilaiMapelLain() async {
       try {
-        // Parent dari siswaMapelRef adalah .../daftarsiswa/{uid}/matapelajaran
         final snapshot = await siswaMapelRef.parent.get();
 
         final List<Map<String, dynamic>> rekapList = [];
         for (var doc in snapshot.docs) {
-          // Kecualikan mapel yang sedang dibuka
           if (doc.id == idMapel) continue;
 
-          // Cast Object? ke Map<String, dynamic>
           final data = doc.data() as Map<String, dynamic>?;
 
           if (data != null) {
@@ -126,11 +147,8 @@ class InputNilaiSiswaController extends GetxController {
       }
     }
 
-
-  // --- [FUNGSI YANG DIPERBARUI] ---
   Future<void> _fetchAtp() async {
     try {
-      // final kelasAngka = int.tryParse(idKelas.split('-').first) ?? 0;
       final kelasString = idKelas.split('-').first.replaceAll(RegExp(r'[^0-9]'), '');
       final kelasAngka = int.tryParse(kelasString) ?? 0;
       final snapshot = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('atp')
@@ -140,9 +158,9 @@ class InputNilaiSiswaController extends GetxController {
       if (snapshot.docs.isNotEmpty) {
         atpModel.value = AtpModel.fromJson(snapshot.docs.first.data());
       } else {
-        atpModel.value = null; // Pastikan null jika tidak ditemukan
+        atpModel.value = null;
       }
-    } catch (e) { Get.snackbar("Info ATP", "Gagal memuat data ATP: $e"); atpModel.value = null; }
+    } catch (e) { print("### Info ATP: Gagal memuat data ATP: $e"); atpModel.value = null; }
   }
 
   Future<void> fetchNilaiDanDeskripsiSiswa() async {
@@ -152,12 +170,10 @@ class InputNilaiSiswaController extends GetxController {
       nilaiPTS.value = data['nilai_pts'];
       nilaiPAS.value = data['nilai_pas'];
       deskripsiCapaianC.text = data['deskripsi_capaian'] ?? '';
-      // --- [PERBAIKAN] Ganti nama 'capaianSiswa' menjadi 'capaianTpSiswa' ---
       if (data['capaian_tp'] != null) capaianTpSiswa.value = Map<String, String>.from(data['capaian_tp']);
     }
   }
 
-  // --- [FUNGSI BARU] Menggantikan simpanCapaianTP lama ---
   void setCapaianTp(String tp, String status) {
     if (capaianTpSiswa[tp] == status) { capaianTpSiswa.remove(tp); } 
     else { capaianTpSiswa[tp] = status; }
@@ -168,7 +184,11 @@ class InputNilaiSiswaController extends GetxController {
     try {
       await siswaMapelRef.set({
         'deskripsi_capaian': deskripsiCapaianC.text.trim(),
-        'capaian_tp': capaianTpSiswa
+        'capaian_tp': capaianTpSiswa,
+        'idGuruPencatat': idGuruPencatat,
+        'namaGuruPencatat': namaGuruPencatat,
+        'aliasGuruPencatatAkhir': aliasGuruPencatat, // Perbaikan: Gunakan 'aliasGuruPencatatAkhir'
+        'lastEdited': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
       Get.snackbar("Berhasil", "Capaian pembelajaran berhasil disimpan.");
     } catch (e) { Get.snackbar("Error", "Gagal menyimpan capaian: $e"); } 
@@ -176,7 +196,6 @@ class InputNilaiSiswaController extends GetxController {
   }
 
   Future<void> fetchBobotNilai() async {
-    // Path baru yang terpusat
     final docRef = _firestore
         .collection('Sekolah').doc(configC.idSekolah)
         .collection('tahunajaran').doc(idTahunAjaran)
@@ -186,7 +205,6 @@ class InputNilaiSiswaController extends GetxController {
       final doc = await docRef.get();
       if (doc.exists && doc.data() != null) {
         final data = doc.data()!;
-        // Mengisi state dengan data dari Firestore
         bobotNilai.value = {
           'tugasHarian': data['bobotTugasHarian'] ?? 20,
           'ulanganHarian': data['bobotUlanganHarian'] ?? 20,
@@ -195,19 +213,13 @@ class InputNilaiSiswaController extends GetxController {
           'pas': data['bobotPas'] ?? 20,
         };
       } else {
-        // --- [IMPLEMENTASI DEFAULT] ---
-        // Jika dokumen tidak ada, gunakan default 20%
         bobotNilai.value = {
-          'tugasHarian': 20,
-          'ulanganHarian': 20,
-          'nilaiTambahan': 20,
-          'pts': 20,
-          'pas': 20,
+          'tugasHarian': 20, 'ulanganHarian': 20, 'nilaiTambahan': 20,
+          'pts': 20, 'pas': 20,
         };
       }
     } catch (e) {
       print("### Gagal fetch bobot nilai, menggunakan default. Error: $e");
-      // Fallback jika terjadi error
       bobotNilai.value = {
         'tugasHarian': 20, 'ulanganHarian': 20, 'nilaiTambahan': 20,
         'pts': 20, 'pas': 20,
@@ -228,20 +240,37 @@ class InputNilaiSiswaController extends GetxController {
     try {
       WriteBatch batch = _firestore.batch();
       final refNilaiBaru = siswaMapelRef.collection('nilai_harian').doc();
-      batch.set(refNilaiBaru, {'kategori': kategori, 'nilai': nilai, 'catatan': catatanC.text.trim(), 'tanggal': Timestamp.now()});
+      
+      // [PERBAIKAN KUNCI DI SINI] Tambahkan semua field yang dibutuhkan
+      batch.set(refNilaiBaru, {
+        'kategori': kategori, 
+        'nilai': nilai, 
+        'catatan': catatanC.text.trim(), 
+        'tanggal': Timestamp.now(),
+        'idGuruPencatat': idGuruPencatat,
+        'namaGuruPencatat': namaGuruPencatat,
+        'aliasGuruPencatat': aliasGuruPencatat,
+        'idSekolah': configC.idSekolah,
+        'idMapel': idMapel,
+        'kelasId': idKelas,
+        'semester': int.parse(semesterAktif),
+      });
       
       final siswaDocRef = _firestore.collection('Sekolah').doc(configC.idSekolah).collection('siswa').doc(siswa.uid);
       batch.set(siswaDocRef.collection('notifikasi').doc(), {
           'judul': 'Nilai Baru: $namaMapel', 'isi': 'Ananda ${siswa.namaLengkap} mendapatkan nilai $nilai untuk $kategori.',
           'tipe': 'NILAI_MAPEL', 'tanggal': FieldValue.serverTimestamp(), 'isRead': false,
+          'idSekolah': configC.idSekolah,
       });
       final metaRef = siswaDocRef.collection('notifikasi_meta').doc('metadata');
-      batch.set(metaRef, {'unreadCount': FieldValue.increment(1)}, SetOptions(merge: true));
+      batch.set(metaRef, {'unreadCount': FieldValue.increment(1), 'idSekolah': configC.idSekolah}, 
+      SetOptions(merge: true));
       
       await batch.commit();
       await fetchNilaiHarian();
       hitungNilaiAkhir();
       Get.back();
+      Get.snackbar("Berhasil", "Nilai $kategori berhasil disimpan.");
     } catch(e) { Get.snackbar("Error", "Gagal menyimpan nilai: $e"); } 
     finally { isSaving.value = false; }
   }
@@ -251,7 +280,14 @@ class InputNilaiSiswaController extends GetxController {
     if (nilai == null || nilai < 0 || nilai > 100) { Get.snackbar("Peringatan", "Nilai harus berupa angka 0-100."); return; }
     isSaving.value = true;
     try {
-      await siswaMapelRef.collection('nilai_harian').doc(idNilai).update({'nilai': nilai, 'catatan': catatanC.text.trim()});
+      await siswaMapelRef.collection('nilai_harian').doc(idNilai).update({
+        'nilai': nilai, 
+        'catatan': catatanC.text.trim(),
+        'idGuruPencatat': idGuruPencatat,
+        'namaGuruPencatat': namaGuruPencatat,
+        'aliasGuruPencatat': aliasGuruPencatat,
+        'lastEdited': FieldValue.serverTimestamp(),
+      });
       await fetchNilaiHarian();
       hitungNilaiAkhir();
       Get.back();
@@ -272,55 +308,119 @@ class InputNilaiSiswaController extends GetxController {
   Future<void> simpanNilaiUtama(String jenisNilai, int nilai) async {
     isSaving.value = true;
     try {
-      await siswaMapelRef.set({jenisNilai: nilai}, SetOptions(merge: true));
+      await siswaMapelRef.set({
+        jenisNilai: nilai,
+        'idGuruPencatat': idGuruPencatat,
+        'namaGuruPencatat': namaGuruPencatat,
+        'aliasGuruPencatatAkhir': aliasGuruPencatat, // Perbaikan: Gunakan 'aliasGuruPencatatAkhir'
+        'lastEdited': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
       await fetchNilaiDanDeskripsiSiswa();
       hitungNilaiAkhir();
       Get.back();
+      Get.snackbar("Berhasil", "Nilai $jenisNilai berhasil disimpan.");
     } catch(e) { Get.snackbar("Error", "Gagal menyimpan nilai: $e"); }
     finally { isSaving.value = false; }
   }
 
-  void hitungNilaiAkhir() {
-    if (bobotNilai.isEmpty) return;
+  // void hitungNilaiAkhir() {
+  //   if (bobotNilai.isEmpty) {
+  //     nilaiAkhir.value = 0.0;
+  //     return;
+  //   }
     
-    // 1. Hitung rata-rata & total dari setiap kategori
-    double avgTugasHarian = _calculateAverage("Harian/PR");
-    double avgUlanganHarian = _calculateAverage('Ulangan Harian');
-    double totalNilaiTambahan = _calculateSum('Nilai Tambahan');
-    int pts = nilaiPTS.value ?? 0;
-    int pas = nilaiPAS.value ?? 0;
+  //   double avgTugasHarian = _calculateAverage("Harian/PR");
+  //   double avgUlanganHarian = _calculateAverage('Ulangan Harian');
+  //   double totalNilaiTambahan = _calculateSum('Nilai Tambahan');
+  //   int pts = nilaiPTS.value ?? 0;
+  //   int pas = nilaiPAS.value ?? 0;
 
-    // 2. Ambil bobot dari state (dengan fallback 0 jika tidak ada)
-    int bobotTugas = bobotNilai['tugasHarian'] ?? 0;
-    int bobotUlangan = bobotNilai['ulanganHarian'] ?? 0;
-    int bobotTambahan = bobotNilai['nilaiTambahan'] ?? 0;
-    int bobotPTS = bobotNilai['pts'] ?? 0;
-    int bobotPAS = bobotNilai['pas'] ?? 0;
+  //   int bobotTugas = bobotNilai['tugasHarian'] ?? 0;
+  //   int bobotUlangan = bobotNilai['ulanganHarian'] ?? 0;
+  //   int bobotPTS = bobotNilai['pts'] ?? 0;
+  //   int bobotPAS = bobotNilai['pas'] ?? 0;
     
-    // 3. Hitung total pembagi (jumlah semua bobot)
-    int totalBobot = bobotTugas + bobotUlangan + bobotTambahan + bobotPTS + bobotPAS;
-    if (totalBobot == 0) {
-      nilaiAkhir.value = 0;
+  //   int totalBobot = bobotTugas + bobotUlangan + bobotPTS + bobotPAS;
+  //   if (totalBobot == 0) {
+  //     nilaiAkhir.value = 0.0;
+  //     return;
+  //   }
+    
+  //   double finalScore = 
+  //       ((avgTugasHarian * bobotTugas) +
+  //       (avgUlanganHarian * bobotUlangan) +
+  //       (pts * bobotPTS) +
+  //       (pas * bobotPAS)) / totalBobot; 
+    
+  //   finalScore += totalNilaiTambahan;
+
+  //   nilaiAkhir.value = finalScore.clamp(0.0, 100.0);
+    
+  //   siswaMapelRef.set({
+  //     'nilai_akhir': nilaiAkhir.value,
+  //     'namaMapel': namaMapel,
+  //     'namaGuru': namaGuru, // Nama guru pengampu mapel
+  //     'idGuru': idGuru,     // ID guru pengampu mapel
+  //     'aliasGuruPencatatAkhir': aliasGuruPencatat, // [PERBAIKAN] Simpan alias guru pencatat/pengampu ke field 'aliasGuruPencatatAkhir'
+  //     'idGuruPencatatAkhir': idGuruPencatat,
+  //     'namaGuruPencatatAkhir': namaGuruPencatat,
+  //     'lastEdited': FieldValue.serverTimestamp(),
+  //   }, SetOptions(merge: true));
+  // }
+
+  void hitungNilaiAkhir() {
+    if (bobotNilai.isEmpty) {
+      nilaiAkhir.value = 0.0;
       return;
     }
     
-    // 4. Hitung skor akhir dengan formula pembobotan yang benar
+    // 1. Hitung rata-rata untuk setiap komponen
+    double avgTugasHarian = _calculateAverage("Harian/PR");
+    double avgUlanganHarian = _calculateAverage('Ulangan Harian');
+    double avgNilaiTambahan = _calculateAverage('Nilai Tambahan'); // Diperlakukan sebagai rata-rata
+    int pts = nilaiPTS.value ?? 0;
+    int pas = nilaiPAS.value ?? 0;
+
+    // 2. Ambil bobot dari state
+    int bobotTugas = bobotNilai['tugasHarian'] ?? 0;
+    int bobotUlangan = bobotNilai['ulanganHarian'] ?? 0;
+    int bobotTambahan = bobotNilai['nilaiTambahan'] ?? 0; // Ambil bobot nilai tambahan
+    int bobotPTS = bobotNilai['pts'] ?? 0;
+    int bobotPAS = bobotNilai['pas'] ?? 0;
+    
+    // 3. Hitung total pembagi bobot
+    int totalBobot = bobotTugas + bobotUlangan + bobotTambahan + bobotPTS + bobotPAS;
+    if (totalBobot == 0) {
+      nilaiAkhir.value = 0.0;
+      return;
+    }
+    
+    // 4. Hitung nilai akhir murni berdasarkan bobot
     double finalScore = 
         ((avgTugasHarian * bobotTugas) +
         (avgUlanganHarian * bobotUlangan) +
+        (avgNilaiTambahan * bobotTambahan) + // Masukkan nilai tambahan ke dalam rata-rata berbobot
         (pts * bobotPTS) +
-        (pas * bobotPAS) +
-        (totalNilaiTambahan)) / totalBobot; // Nilai tambahan tidak dibobot, tapi dijumlahkan
-
-    // 5. Pastikan nilai tidak melebihi 100
-    nilaiAkhir.value = finalScore > 100.0 ? 100.0 : finalScore;
+        (pas * bobotPAS)) / totalBobot; 
     
-    // 6. Simpan nilai akhir ke Firestore
+    nilaiAkhir.value = finalScore.clamp(0.0, 100.0);
+    
+    // 5. Simpan semua hasil perhitungan ke Firestore
     siswaMapelRef.set({
       'nilai_akhir': nilaiAkhir.value,
+      'rata_rata_tugas': avgTugasHarian,
+      'rata_rata_ulangan': avgUlanganHarian,
+      'rata_rata_tambahan': avgNilaiTambahan,
+      // Field lain yang sudah ada juga di-set di sini
       'namaMapel': namaMapel,
-      'namaGuru': namaGuru, // Disimpan untuk referensi
+      'namaGuru': namaGuru,
       'idGuru': idGuru,
+      'aliasGuruPencatatAkhir': aliasGuruPencatat,
+      'idGuruPencatatAkhir': idGuruPencatat,
+      'namaGuruPencatatAkhir': namaGuruPencatat,
+      'lastEdited': FieldValue.serverTimestamp(),
+      'kelasId': idKelas, // Pastikan field ini juga tersimpan
+      'semester': int.parse(semesterAktif), // Pastikan field ini juga tersimpan
     }, SetOptions(merge: true));
   }
   

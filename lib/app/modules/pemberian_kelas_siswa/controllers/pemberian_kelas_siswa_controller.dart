@@ -26,6 +26,7 @@ class PemberianKelasSiswaController extends GetxController {
   final RxList<PegawaiModel> daftarGuru = <PegawaiModel>[].obs;
   final RxString searchQueryGuru = "".obs;
   final RxSet<String> assignedWaliKelasUids = <String>{}.obs;
+  final RxList<Map<String, dynamic>> daftarMasterKelas = <Map<String, dynamic>>[].obs;
 
   String get tahunAjaranAktif => configC.tahunAjaranAktif.value;
   String get semesterAktif => configC.semesterAktif.value;
@@ -55,9 +56,21 @@ class PemberianKelasSiswaController extends GetxController {
       fetchKelas(),
       fetchSiswaTanpaKelas(),
       fetchDaftarGuru(),
+      _fetchMasterKelas(),
     ]);
     isLoading.value = false;
   }
+
+  Future<void> _fetchMasterKelas() async {
+  try {
+    final snapshot = await _firestore
+        .collection('Sekolah').doc(configC.idSekolah)
+        .collection('master_kelas').orderBy('urutan').get();
+    daftarMasterKelas.assignAll(snapshot.docs.map((doc) => doc.data()).toList());
+  } catch (e) {
+    Get.snackbar("Error", "Gagal memuat data master kelas: $e");
+  }
+}
 
   Future<void> fetchKelas() async {
     if (tahunAjaranAktif.isEmpty || tahunAjaranAktif.contains("TIDAK")) return;
@@ -77,10 +90,13 @@ class PemberianKelasSiswaController extends GetxController {
   }
 
   Future<void> fetchDaftarGuru() async {
-    final snapshot = await _firestore.collection('Sekolah').doc(configC.idSekolah)
-        .collection('pegawai').where('role', isEqualTo: 'Guru Kelas').get();
-    daftarGuru.assignAll(snapshot.docs.map((doc) => PegawaiModel.fromFirestore(doc)).toList());
-  }
+  final snapshot = await _firestore
+      .collection('Sekolah').doc(configC.idSekolah)
+      .collection('pegawai').where('role', isEqualTo: 'Guru Kelas').get();
+  // --- [PERBAIKAN] Langsung gunakan model yang sudah cerdas ---
+  daftarGuru.assignAll(snapshot.docs.map((doc) => PegawaiModel.fromFirestore(doc)).toList());
+  // -----------------------------------------------------------
+}
 
   Future<void> pilihKelas(DocumentSnapshot kelasDoc) async {
     kelasTerpilih.value = kelasDoc;
@@ -104,16 +120,18 @@ class PemberianKelasSiswaController extends GetxController {
     final siswaRef = _firestore.collection('Sekolah').doc(configC.idSekolah).collection('siswa').doc(siswa.uid);
     
     final kelasTahunAjaranRef = _firestore.collection('Sekolah').doc(configC.idSekolah)
-      .collection('tahunajaran').doc(tahunAjaranAktif)
-      .collection('kelastahunajaran').doc(kelasRef.id);
+  .collection('tahunajaran').doc(tahunAjaranAktif)
+  .collection('kelastahunajaran').doc(kelasRef.id);
       
-    final semesterSiswaRef = kelasTahunAjaranRef.collection('semester').doc(semesterAktif).collection('daftarsiswa').doc(siswa.uid);
+    // final semesterSiswaRef = kelasTahunAjaranRef.collection('semester').doc(semesterAktif).collection('daftarsiswa').doc(siswa.uid);
+    final daftarSiswaRef = kelasTahunAjaranRef.collection('daftarsiswa').doc(siswa.uid);
 
     WriteBatch batch = _firestore.batch();
     
     batch.update(kelasRef, {'siswaUids': FieldValue.arrayUnion([siswa.uid])});
     batch.update(siswaRef, {'kelasId': kelasRef.id, 'statusSiswa': 'Aktif'});
-    batch.set(semesterSiswaRef, {'uid': siswa.uid, 'nisn': siswa.nisn, 'namasiswa': siswa.namaLengkap});
+    // batch.set(semesterSiswaRef, {'uid': siswa.uid, 'nisn': siswa.nisn, 'namasiswa': siswa.namaLengkap});
+    batch.set(daftarSiswaRef, {'uid': siswa.uid, 'nisn': siswa.nisn, 'namaLengkap': siswa.namaLengkap});
     
     await batch.commit();
     
@@ -148,72 +166,106 @@ class PemberianKelasSiswaController extends GetxController {
 
   // --- FUNGSI LAINNYA TIDAK BERUBAH ---
   void showBuatKelasDialog() {
-    final TextEditingController namaKelasC = TextEditingController();
+    final Rxn<Map<String, dynamic>> kelasTerpilihDariMaster = Rxn<Map<String, dynamic>>();
+
+    // Filter master kelas: hanya tampilkan yang belum dibuat di tahun ajaran ini
+    final namaKelasYangSudahAda = daftarKelas.map((doc) => (doc.data() as Map)['namaKelas']).toSet();
+    final pilihanKelasTersedia = daftarMasterKelas.where((master) => !namaKelasYangSudahAda.contains(master['namaKelas'])).toList();
+
     Get.defaultDialog(
       title: "Buat Kelas Baru",
-      content: TextField(controller: namaKelasC, autofocus: true, decoration: const InputDecoration(labelText: "Nama Kelas (contoh: 1A)")),
-      actions: [ OutlinedButton(onPressed: () => Get.back(), child: const Text("Batal")), ElevatedButton(onPressed: () { Get.back(); _buatKelas(namaKelasC.text.trim().toUpperCase()); }, child: const Text("Buat"))]);
+      content: Obx(() => DropdownButtonFormField<Map<String, dynamic>>(
+        value: kelasTerpilihDariMaster.value,
+        hint: const Text("Pilih dari master kelas..."),
+        isExpanded: true,
+        items: pilihanKelasTersedia.map((masterKelas) {
+          return DropdownMenuItem<Map<String, dynamic>>(
+            value: masterKelas,
+            child: Text(masterKelas['namaKelas']),
+          );
+        }).toList(),
+        onChanged: (value) {
+          kelasTerpilihDariMaster.value = value;
+        },
+        validator: (value) => value == null ? 'Pilihan tidak boleh kosong' : null,
+      )),
+      actions: [
+        OutlinedButton(onPressed: () => Get.back(), child: const Text("Batal")),
+        ElevatedButton(
+          onPressed: () {
+            if (kelasTerpilihDariMaster.value != null) {
+              Get.back();
+              _buatKelas(kelasTerpilihDariMaster.value!);
+            } else {
+              Get.snackbar("Peringatan", "Anda harus memilih kelas dari daftar.");
+            }
+          },
+          child: const Text("Buat"),
+        ),
+      ],
+    );
   }
 
-  Future<void> _buatKelas(String namaKelas) async {
-    if (namaKelas.isEmpty) return;
+  Future<void> _buatKelas(Map<String, dynamic> masterKelasData) async {
+    final namaKelas = masterKelasData['namaKelas'];
+    final fase = masterKelasData['fase'];
+
+    if (namaKelas == null || namaKelas.isEmpty) return;
+
     final kelasId = "$namaKelas-$tahunAjaranAktif";
-    final fase = _getFaseFromNamaKelas(namaKelas);
     await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('kelas').doc(kelasId).set({
-      'namaKelas': namaKelas, 'tahunAjaran': tahunAjaranAktif, 'fase': fase, 'waliKelasUid': null, 'waliKelasNama': null, 'siswaUids': [],
+      'namaKelas': namaKelas,
+      'tahunAjaran': tahunAjaranAktif,
+      'fase': fase,
+      'waliKelasUid': null,
+      'waliKelasNama': null,
+      'siswaUids': [],
     });
-    fetchKelas();
+    fetchKelas(); // Ambil ulang daftar kelas untuk memperbarui UI
   }
 
-  String _getFaseFromNamaKelas(String namaKelas) {
-    if (namaKelas.startsWith('1') || namaKelas.startsWith('2')) return "Fase A";
-    if (namaKelas.startsWith('3') || namaKelas.startsWith('4')) return "Fase B";
-    if (namaKelas.startsWith('5') || namaKelas.startsWith('6')) return "Fase C";
-    return "Fase Tidak Diketahui";
-  }
+    Future<void> assignWaliKelas(PegawaiModel guru) async {
+      if (kelasTerpilih.value == null) return;
+      isWaliKelasLoading.value = true;
 
-  Future<void> assignWaliKelas(PegawaiModel guru) async {
-    if (kelasTerpilih.value == null) return;
-    isWaliKelasLoading.value = true;
-    
-    final kelasDoc = kelasTerpilih.value!;
-    final kelasRef = kelasDoc.reference;
-    final guruBaruRef = _firestore.collection('Sekolah').doc(configC.idSekolah).collection('pegawai').doc(guru.uid);
-    final String? guruLamaUid = (kelasDoc.data() as Map<String, dynamic>)['waliKelasUid'];
-  
-    WriteBatch batch = _firestore.batch();
-    
-    // Hapus status wali kelas dari guru yang lama (jika ada)
-    if (guruLamaUid != null && guruLamaUid.isNotEmpty) {
-      final guruLamaRef = _firestore.collection('Sekolah').doc(configC.idSekolah).collection('pegawai').doc(guruLamaUid);
-      batch.update(guruLamaRef, {'waliKelasDari': FieldValue.delete()});
+      final kelasDoc = kelasTerpilih.value!;
+      final kelasRef = kelasDoc.reference;
+      final guruBaruRef = _firestore.collection('Sekolah').doc(configC.idSekolah).collection('pegawai').doc(guru.uid);
+      final String? guruLamaUid = (kelasDoc.data() as Map<String, dynamic>)['waliKelasUid'];
+
+      WriteBatch batch = _firestore.batch();
+
+      if (guruLamaUid != null && guruLamaUid.isNotEmpty) {
+        final guruLamaRef = _firestore.collection('Sekolah').doc(configC.idSekolah).collection('pegawai').doc(guruLamaUid);
+        batch.update(guruLamaRef, {'waliKelasDari': FieldValue.delete()});
+      }
+
+      batch.update(guruBaruRef, {'waliKelasDari': kelasRef.id});
+
+      // --- [PERBAIKAN] Simpan alias dan nama lengkap ---
+      final namaUntukDitampilkan = (guru.alias == null || guru.alias!.isEmpty) ? guru.nama : guru.alias!;
+      batch.update(kelasRef, {
+        'waliKelasUid': guru.uid,
+        'waliKelasNama': namaUntukDitampilkan, // Ini adalah alias (atau nama jika alias kosong)
+        'waliKelasNamaLengkap': guru.nama, // Field baru untuk referensi
+      });
+
+      final kelasTahunAjaranRef = _firestore.collection('Sekolah').doc(configC.idSekolah)
+        .collection('tahunajaran').doc(tahunAjaranAktif)
+        .collection('kelastahunajaran').doc(kelasRef.id);
+
+      batch.set(kelasTahunAjaranRef, {
+        'idWaliKelas': guru.uid,
+        'namaWaliKelas': namaUntukDitampilkan, // Gunakan variabel yang sama
+        'namaKelas': (kelasDoc.data() as Map<String, dynamic>)['namaKelas'],
+      }, SetOptions(merge: true));
+      // --- AKHIR PERBAIKAN ---
+
+      await batch.commit();
+
+      await fetchKelas();
+      kelasTerpilih.value = await kelasRef.get();
+      isWaliKelasLoading.value = false;
+      Get.back();
     }
-  
-    // Tetapkan status wali kelas ke guru yang baru
-    batch.update(guruBaruRef, {'waliKelasDari': kelasRef.id});
-  
-    // Perbarui dokumen di koleksi /kelas
-    final namaUntukDitampilkan = guru.alias ?? guru.nama;
-    batch.update(kelasRef, {'waliKelasUid': guru.uid, 'waliKelasNama': namaUntukDitampilkan});
-    
-    // --- [LOGIKA BARU & PENTING] ---
-    // Buat atau perbarui dokumen di /kelastahunajaran untuk sinkronisasi
-    final kelasTahunAjaranRef = _firestore.collection('Sekolah').doc(configC.idSekolah)
-      .collection('tahunajaran').doc(tahunAjaranAktif)
-      .collection('kelastahunajaran').doc(kelasRef.id);
-      
-    batch.set(kelasTahunAjaranRef, {
-      'idWaliKelas': guru.uid,
-      'namaWaliKelas': namaUntukDitampilkan,
-      'namaKelas': (kelasDoc.data() as Map<String, dynamic>)['namaKelas'],
-    }, SetOptions(merge: true)); // Gunakan merge agar tidak menimpa data siswa
-  
-    await batch.commit();
-  
-    // Muat ulang data untuk me-refresh UI
-    await fetchKelas();
-    kelasTerpilih.value = await kelasRef.get();
-    isWaliKelasLoading.value = false;
-    Get.back(); // Tutup dialog
-  }
 }

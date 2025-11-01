@@ -1,136 +1,117 @@
-// lib/app/modules/absensi_wali_kelas/views/absensi_wali_kelas_view.dart
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:sdtq_telagailmu_yogyakarta/app/models/siswa_simple_model.dart';
+import '../../../models/siswa_absensi_model.dart';
 import '../controllers/absensi_wali_kelas_controller.dart';
 
 class AbsensiWaliKelasView extends GetView<AbsensiWaliKelasController> {
   const AbsensiWaliKelasView({Key? key}) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Absensi Kelas'),
         actions: [
-          Obx(() => TextButton(
-            onPressed: controller.isSaving.value ? null : controller.simpanAbsensi,
-            child: Text("SIMPAN", style: TextStyle(color: controller.isSaving.value ? Colors.grey : Colors.black, fontWeight: FontWeight.bold)),
-          )),
+          IconButton(
+            icon: const Icon(Icons.calendar_today),
+            onPressed: () async {
+              final pickedDate = await showDatePicker(
+                context: context,
+                initialDate: controller.selectedDate.value,
+                firstDate: DateTime(2022),
+                lastDate: DateTime.now(),
+              );
+              if (pickedDate != null) {
+                controller.onDateChanged(pickedDate);
+              }
+            },
+          ),
         ],
       ),
-      body: Obx(() {
-        if (controller.isLoading.value) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        return Column(
-          children: [
-            _buildHeaderRekap(),
-            _buildCatatanHarian(),
-            const Divider(height: 1),
-            Expanded(
-              child: ListView.builder(
+      body: Column(
+        children: [
+          // Header Tanggal
+          Container(
+            padding: const EdgeInsets.all(12),
+            color: Colors.indigo.shade50,
+            child: Obx(() => Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(controller.selectedDate.value),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ],
+                )),
+          ),
+          
+          // Daftar Siswa
+          Expanded(
+            child: Obx(() {
+              if (controller.isLoading.value) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (controller.kelasDiampu.isEmpty) {
+                return const Center(child: Text("Anda tidak ditugaskan sebagai wali kelas."));
+              }
+              if (controller.daftarSiswa.isEmpty) {
+                return const Center(child: Text("Tidak ada siswa di kelas ini."));
+              }
+              return ListView.builder(
                 itemCount: controller.daftarSiswa.length,
                 itemBuilder: (context, index) {
                   final siswa = controller.daftarSiswa[index];
-                  return _buildSiswaItem(siswa);
+                  return _buildSiswaTile(siswa);
                 },
-              ),
-            ),
-          ],
-        );
-      }),
-    );
-  }
-
-  Widget _buildHeaderRekap() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      color: Colors.blue.shade50,
-      child: Column(
-        children: [
-          Text(
-            "Absensi untuk ${DateFormat('EEEE, dd MMMM yyyy', 'id_ID').format(DateTime.now())}",
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              );
+            }),
           ),
-          const SizedBox(height: 8),
-          Obx(() => Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _rekapItem("Total Siswa", controller.totalSiswa.value, Colors.black),
-              _rekapItem("Hadir", controller.totalHadir.value, Colors.green.shade700),
-              _rekapItem("Sakit", controller.totalSakit.value, Colors.orange.shade700),
-              _rekapItem("Izin", controller.totalIzin.value, Colors.blue.shade700),
-              _rekapItem("Alfa", controller.totalAlfa.value, Colors.red.shade700),
-            ],
-          )),
         ],
       ),
-    );
-  }
-  
-  Widget _rekapItem(String label, int value, Color color) {
-    return Column(
-      children: [
-        Text(value.toString(), style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
-        Text(label, style: TextStyle(fontSize: 12, color: color)),
-      ],
-    );
-  }
-  
-  Widget _buildCatatanHarian() {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: TextField(
-        controller: controller.catatanHarianC,
-        decoration: const InputDecoration(
-          isDense: true,
-          hintText: "Catatan harian kelas (opsional)...",
-          prefixIcon: Icon(Icons.note_alt_outlined),
-        ),
+      // Tombol Simpan
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Obx(() => ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+              onPressed: controller.isSaving.value ? null : controller.simpanAbsensi,
+              icon: controller.isSaving.value
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.save),
+              label: Text(controller.isSaving.value ? "MENYIMPAN..." : "Simpan Absensi Hari Ini"),
+            )),
       ),
     );
   }
 
-  Widget _buildSiswaItem(SiswaSimpleModel siswa) {
-    return Obx(() {
-      final status = controller.statusAbsensi[siswa.uid] ?? 'H';
-      final showKeterangan = status == 'S' || status == 'I' || status == 'A';
-      return Column(
-        children: [
-          ListTile(
-            leading: CircleAvatar(child: Text(siswa.nama.isNotEmpty ? siswa.nama[0] : '-')),
-            title: Text(siswa.nama),
-            trailing: ToggleButtons(
-              isSelected: [status == 'S', status == 'I', status == 'A'],
-              onPressed: (index) {
-                if (index == 0) controller.setStatusAbsensi(siswa.uid, 'S');
-                if (index == 1) controller.setStatusAbsensi(siswa.uid, 'I');
-                if (index == 2) controller.setStatusAbsensi(siswa.uid, 'A');
-              },
-              borderRadius: BorderRadius.circular(8),
-              children: const [
-                Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text("S")),
-                Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text("I")),
-                Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text("A")),
+  // Widget untuk setiap baris siswa
+  Widget _buildSiswaTile(SiswaAbsensiModel siswa) {
+    return ListTile(
+      leading: CircleAvatar(child: Text("${controller.daftarSiswa.indexOf(siswa) + 1}")),
+      title: Text(siswa.nama),
+      trailing: Obx(() => SizedBox(
+            // --- [PERBAIKAN] Atur lebar secara manual untuk mencegah overflow ---
+            width: 180, // Sesuaikan nilai ini jika perlu
+            // -----------------------------------------------------------------
+            child: SegmentedButton<String>(
+              // --- [PERBAIKAN] Buat tombol lebih ringkas ---
+              style: SegmentedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                visualDensity: VisualDensity.compact,
+              ),
+              // ---------------------------------------------
+              segments: const [
+                ButtonSegment(value: 'Hadir', label: Text('H'), tooltip: "Hadir"),
+                ButtonSegment(value: 'Sakit', label: Text('S'), tooltip: "Sakit"),
+                ButtonSegment(value: 'Izin', label: Text('I'), tooltip: "Izin"),
+                ButtonSegment(value: 'Alfa', label: Text('A'), tooltip: "Alfa"),
               ],
+              selected: {siswa.status.value},
+              onSelectionChanged: (newSelection) {
+                controller.ubahStatusAbsensi(siswa, newSelection.first);
+              },
             ),
-          ),
-          if (showKeterangan)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(72, 0, 16, 12),
-              child: TextField(
-                controller: controller.keteranganControllers[siswa.uid],
-                decoration: InputDecoration(
-                  isDense: true,
-                  hintText: "Keterangan (misal: surat dokter)...",
-                  prefixIcon: const Icon(Icons.edit_note_rounded),
-                ),
-              ),
-            ),
-        ],
-      );
-    });
+          )),
+    );
   }
 }

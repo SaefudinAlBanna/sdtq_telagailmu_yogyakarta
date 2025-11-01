@@ -6,10 +6,13 @@ import 'package:get/get.dart';
 import 'package:sdtq_telagailmu_yogyakarta/app/controllers/config_controller.dart';
 import 'package:sdtq_telagailmu_yogyakarta/app/models/info_penggantian_model.dart';
 
+import '../../../controllers/dashboard_controller.dart';
+
 class PusatInformasiPenggantianController extends GetxController with GetSingleTickerProviderStateMixin {
   late TabController tabController;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final ConfigController configC = Get.find<ConfigController>();
+  final DashboardController dashC = Get.find<DashboardController>();
 
   final RxBool isLoadingInsidental = true.obs;
   final RxBool isLoadingRentang = true.obs;

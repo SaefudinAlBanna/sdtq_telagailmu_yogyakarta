@@ -79,6 +79,7 @@ class UpsertSiswaController extends GetxController {
           'namaLengkap': namaC.text, 'nisn': nisnC.text, 'spp': num.tryParse(sppC.text) ?? 0, 'email': emailSiswa,
           'isProfileComplete': false, 'mustChangePassword': true, 'statusSiswa': "Aktif",
           'createdAt': FieldValue.serverTimestamp(), 'createdBy': adminEmail, 'uid': cred.user!.uid,
+          'kelasId': null,
         };
         await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('siswa').doc(cred.user!.uid).set(dataSiswa);
         

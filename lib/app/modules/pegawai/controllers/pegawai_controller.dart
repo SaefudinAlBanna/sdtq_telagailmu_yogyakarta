@@ -32,7 +32,9 @@ class PegawaiController extends GetxController {
   bool get canConfigureRoles {
     final role = configController.infoUser['role'];
     const allowedRoles = ['Kepala Sekolah', 'TU', 'Tata Usaha'];
-    return configController.infoUser['peranSistem'] == 'superadmin' || allowedRoles.contains(role);
+    final tugas = configController.infoUser['tugas'];
+    const allowedTugas = ['Koordinator Kurikulum'];
+    return configController.infoUser['peranSistem'] == 'superadmin' || allowedRoles.contains(role) || allowedTugas.contains(tugas);
   }
 
   @override

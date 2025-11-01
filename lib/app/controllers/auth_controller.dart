@@ -1,4 +1,4 @@
-// lib/app/controllers/auth_controller.dart (VERSI BARU UNTUK KEDUA APLIKASI)
+// lib/app/controllers/auth_controller.dart (Aplikasi SEKOLAH)
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -7,7 +7,8 @@ import 'package:get/get.dart';
 import '../modules/home/controllers/home_controller.dart';
 import '../modules/login/controllers/login_controller.dart';
 import '../routes/app_pages.dart';
-import 'config_controller.dart'; // atau 'aplikasi_orangtua'
+import 'config_controller.dart';
+import 'dashboard_controller.dart';
 
 class AuthController extends GetxController {
   final FirebaseAuth auth = FirebaseAuth.instance;
@@ -50,32 +51,27 @@ class AuthController extends GetxController {
     try {
       isLoading.value = true;
 
-      // Hancurkan instance LoginController yang mungkin ada
       if (Get.isRegistered<LoginController>()) {
         Get.delete<LoginController>(force: true);
       }
-
-      // --- [PERBAIKAN FINAL] ---
-      // Hancurkan juga HomeController secara paksa untuk mencegah 'zombie controller'.
       if (Get.isRegistered<HomeController>()) {
         Get.delete<HomeController>(force: true);
       }
-      // --------------------------
-
-      Get.offAllNamed(AppPages.INITIAL); 
-
-      await Future.delayed(const Duration(milliseconds: 150));
-      
+      if (Get.isRegistered<DashboardController>()) {
+        Get.find<DashboardController>().cancelDashboardStreams();
+      }
       if (Get.isRegistered<ConfigController>()) {
         final configC = Get.find<ConfigController>();
         await configC.clearUserConfig();
       }
       
       await auth.signOut();
+      
+      Get.offAllNamed(Routes.ROOT);
 
     } catch (e) {
       Get.snackbar("Error", "Gagal untuk logout: ${e.toString()}", snackPosition: SnackPosition.BOTTOM);
-      Get.offAllNamed(AppPages.INITIAL);
+      Get.offAllNamed(Routes.ROOT);
     } finally {
       isLoading.value = false;
     }

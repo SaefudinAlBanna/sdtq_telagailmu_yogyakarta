@@ -3,10 +3,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:sdtq_telagailmu_yogyakarta/app/controllers/config_controller.dart';
-import 'package:sdtq_telagailmu_yogyakarta/app/models/atp_model.dart';
-import 'package:sdtq_telagailmu_yogyakarta/app/modules/perangkat_ajar/controllers/perangkat_ajar_controller.dart';
 import 'package:uuid/uuid.dart';
+
+import '../../../controllers/config_controller.dart';
+import '../../../models/atp_model.dart';
+import '../../perangkat_ajar/controllers/perangkat_ajar_controller.dart';
 
 class AtpFormController extends GetxController {
   final PerangkatAjarController _perangkatAjarC = Get.find<PerangkatAjarController>();
@@ -67,7 +68,7 @@ class AtpFormController extends GetxController {
       // Buat daftar mapel unik dari data penugasan
       final mapelSet = <String>{};
       for (var tugas in penugasanGuru) {
-        mapelSet.add(tugas['namamatapelajaran']);
+        mapelSet.add(tugas['namaMapel']);
       }
       daftarMapelUnik.assignAll(mapelSet.toList()..sort());
 
@@ -99,7 +100,7 @@ class AtpFormController extends GetxController {
       // Filter penugasan untuk mapel yang dipilih, lalu ambil kelasnya
       final kelasSet = <String>{};
       for (var tugas in penugasanGuru) {
-        if (tugas['namamatapelajaran'] == newValue) {
+        if (tugas['namaMapel'] == newValue) {
           // Ambil hanya angka dari ID kelas (e.g., '4' dari '4A-2024')
           final kelasAngka = tugas['idKelas'].split('-').first.replaceAll(RegExp(r'[^0-9]'), '');
           if (kelasAngka.isNotEmpty) kelasSet.add(kelasAngka);
