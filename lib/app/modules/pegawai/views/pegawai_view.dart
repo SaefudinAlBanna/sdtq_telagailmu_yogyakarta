@@ -68,7 +68,36 @@ class PegawaiView extends GetView<PegawaiController> {
                         : null,
                   ),
                   title: Text(pegawai.alias ?? pegawai.nama, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text(pegawai.role.displayName),
+                  subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Tampilkan role. Jika tidak diketahui, tampilkan string mentah dari DB.
+                        Text(
+                          pegawai.roleString != null && pegawai.roleString!.isNotEmpty
+                            ? pegawai.roleString!
+                            : pegawai.role.displayName,
+                          style: TextStyle(
+                            color: pegawai.roleString != null && pegawai.roleString!.isNotEmpty ? Colors.deepPurple[800] : null,
+                          ),
+                        ),                        
+                        // Jika ada tugas, tampilkan dalam bentuk chip kecil
+                        if (pegawai.tugas.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4.0),
+                            child: Wrap(
+                              spacing: 6.0,
+                              runSpacing: 4.0,
+                              children: pegawai.tugas.map((tugas) => Chip(
+                                label: Text(tugas),
+                                labelStyle: const TextStyle(fontSize: 10),
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                                backgroundColor: Colors.blue.shade50,
+                                visualDensity: VisualDensity.compact,
+                              )).toList(),
+                            ),
+                          ),
+                      ],
+                    ),
                   trailing: (controller.canManagePegawai)
                       ? Row(
                           mainAxisSize: MainAxisSize.min,

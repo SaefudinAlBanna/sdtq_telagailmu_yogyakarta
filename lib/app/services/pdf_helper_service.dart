@@ -11,6 +11,7 @@ import '../controllers/config_controller.dart';
 import '../models/absensi_rekap_model.dart';
 import '../models/jurnal_laporan_item_model.dart';
 // import '../modules/halaqah_ummi_dashboard_koordinator/controllers/halaqah_ummi_dashboard_koordinator_controller.dart';
+import '../models/rapor_model.dart';
 import '../modules/rekap_absensi/controllers/rekap_absensi_controller.dart';
 
 class PdfHelperService {
@@ -167,6 +168,152 @@ class PdfHelperService {
         ),
       ]
     );
+  }
+
+  // =======================================================================
+  // [FUNGSI BARU] UNTUK MEMBANGUN KONTEN RAPOR DIGITAL
+  // =======================================================================
+  static Future<List<pw.Widget>> buildRaporDigitalContent({
+    required RaporModel rapor,
+    required pw.Font regularFont,
+    required pw.Font boldFont,
+    required pw.Font italicFont,
+  }) async {
+    final widgets = <pw.Widget>[];
+  
+    // --- Bagian Informasi Siswa ---
+    widgets.add(pw.Text("LAPORAN PENCAPAIAN KOMPETENSI PESERTA DIDIK",
+        style: pw.TextStyle(font: boldFont, fontSize: 14), textAlign: pw.TextAlign.center));
+    widgets.add(pw.SizedBox(height: 16));
+    widgets.add(pw.Table(
+      columnWidths: { 0: const pw.FlexColumnWidth(1), 1: const pw.FlexColumnWidth(2) },
+      children: [
+        pw.TableRow(children: [ pw.Text("Nama Siswa", style: pw.TextStyle(font: regularFont)), pw.Text(": ${rapor.namaSiswa}", style: pw.TextStyle(font: boldFont)) ]),
+        pw.TableRow(children: [ pw.Text("NISN", style: pw.TextStyle(font: regularFont)), pw.Text(": ${rapor.nisn}") ]),
+        pw.TableRow(children: [ pw.Text("Kelas", style: pw.TextStyle(font: regularFont)), pw.Text(": ${rapor.idKelas.split('-').first}") ]),
+        pw.TableRow(children: [ pw.Text("Semester", style: pw.TextStyle(font: regularFont)), pw.Text(": ${rapor.semester}") ]),
+        pw.TableRow(children: [ pw.Text("Tahun Ajaran", style: pw.TextStyle(font: regularFont)), pw.Text(": ${rapor.idTahunAjaran.replaceAll('-', '/')}") ]),
+      ]
+    ));
+    widgets.add(pw.SizedBox(height: 16));
+  
+    // --- Bagian A: Nilai Akademik ---
+    widgets.add(pw.Text("A. Nilai Akademik", style: pw.TextStyle(font: boldFont, fontSize: 12)));
+    widgets.add(pw.Table(
+      border: pw.TableBorder.all(),
+      columnWidths: { 0: const pw.FlexColumnWidth(0.5), 1: const pw.FlexColumnWidth(2), 2: const pw.FlexColumnWidth(0.8), 3: const pw.FlexColumnWidth(4) },
+      children: [
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+          children: ['No', 'Mata Pelajaran', 'Nilai', 'Capaian Kompetensi'].map((h) => pw.Padding(
+            padding: const pw.EdgeInsets.all(4),
+            child: pw.Text(h, style: pw.TextStyle(font: boldFont), textAlign: pw.TextAlign.center),
+          )).toList(),
+        ),
+        ...rapor.daftarNilaiMapel.asMap().entries.map((entry) {
+          final index = entry.key + 1;
+          final nilai = entry.value;
+          return pw.TableRow(children: [
+            pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(index.toString(), textAlign: pw.TextAlign.center)),
+            pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(nilai.namaMapel)),
+            pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(nilai.nilaiAkhir.toStringAsFixed(1), textAlign: pw.TextAlign.center)),
+            pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(nilai.deskripsiCapaian, style: const pw.TextStyle(fontSize: 9))),
+          ]);
+        }),
+      ],
+    ));
+  
+    // --- Bagian B: Pengembangan Diri ---
+    widgets.add(pw.SizedBox(height: 16));
+    widgets.add(pw.Text("B. Pengembangan Diri", style: pw.TextStyle(font: boldFont, fontSize: 12)));
+    widgets.add(pw.Table(
+      border: pw.TableBorder.all(),
+      columnWidths: { 0: const pw.FlexColumnWidth(2), 1: const pw.FlexColumnWidth(1), 2: const pw.FlexColumnWidth(4) },
+      children: [
+        pw.TableRow(
+          decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+          children: ['Jenis Kegiatan', 'Predikat', 'Keterangan'].map((h) => pw.Padding(
+            padding: const pw.EdgeInsets.all(4),
+            child: pw.Text(h, style: pw.TextStyle(font: boldFont), textAlign: pw.TextAlign.center),
+          )).toList(),
+        ),
+        // Halaqah
+        pw.TableRow(children: [
+          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text("Halaqah")),
+          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(rapor.dataHalaqah.nilaiAkhir?.toString() ?? '-', textAlign: pw.TextAlign.center)),
+          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text("Tingkat: ${rapor.dataHalaqah.tingkatan}.\n${rapor.dataHalaqah.catatan}", style: const pw.TextStyle(fontSize: 9))),
+        ]),
+        // Ekskul
+        ...rapor.daftarEkskul.map((ekskul) => pw.TableRow(children: [
+          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(ekskul.namaEkskul)),
+          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(ekskul.nilai, textAlign: pw.TextAlign.center)),
+          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(ekskul.catatan, style: const pw.TextStyle(fontSize: 9))),
+        ])),
+      ],
+    ));
+  
+    // --- Bagian C & D ---
+    widgets.add(pw.SizedBox(height: 16));
+    widgets.add(pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+      // Bagian C: Ketidakhadiran
+      pw.Text("C. Ketidakhadiran", style: pw.TextStyle(font: boldFont, fontSize: 12)),
+      pw.Container(
+        width: 250, // Batasi lebar tabel absensi agar tidak terlalu besar
+        child: pw.Table(
+          border: pw.TableBorder.all(),
+          children: [
+            _buildAbsenRow("Sakit", rapor.rekapAbsensi.sakit),
+            _buildAbsenRow("Izin", rapor.rekapAbsensi.izin),
+            _buildAbsenRow("Tanpa Keterangan", rapor.rekapAbsensi.alpa),
+          ]
+        ),
+      ),
+      pw.SizedBox(height: 16),
+      // Bagian D: Catatan Wali Kelas (Sekarang di bawah C)
+      pw.Text("D. Catatan Wali Kelas", style: pw.TextStyle(font: boldFont, fontSize: 12)),
+      pw.Container(
+        width: double.infinity,
+        padding: const pw.EdgeInsets.all(8),
+        decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.black)),
+        child: pw.Text(rapor.catatanWaliKelas, style: pw.TextStyle(font: italicFont, fontSize: 9), maxLines: 5),
+      ),
+    ]
+  ));
+  
+    // --- Bagian Tanda Tangan ---
+    widgets.add(pw.SizedBox(height: 40));
+    widgets.add(pw.Spacer());
+    widgets.add(pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+      children: [
+        pw.Column(children: [
+          pw.Text("Mengetahui,"),
+          pw.Text("Orang Tua/Wali"),
+          pw.SizedBox(height: 60),
+          // [MODIFIKASI] Ambil nama dari RaporModel
+          pw.Text("( ${rapor.namaOrangTua} )", style: pw.TextStyle(font: boldFont)),
+        ]),
+        pw.Column(children: [
+          pw.Text("Yogyakarta, ${DateFormat('dd MMMM yyyy', 'id_ID').format(rapor.tanggalGenerate)}"),
+          pw.Text("Wali Kelas"),
+          pw.SizedBox(height: 60),
+          // [MODIFIKASI] Ambil nama dari RaporModel
+          pw.Text("( ${rapor.namaWaliKelas} )", style: pw.TextStyle(font: boldFont)),
+        ]),
+      ]
+    ));
+
+    return widgets;
+  }
+  
+  // Helper untuk tabel absensi
+  static pw.TableRow _buildAbsenRow(String label, int value) {
+    return pw.TableRow(children: [
+      pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(label)),
+      pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text("$value hari", textAlign: pw.TextAlign.right)),
+    ]);
   }
 
   // =======================================================================

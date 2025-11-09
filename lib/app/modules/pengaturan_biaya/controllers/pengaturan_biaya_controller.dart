@@ -72,20 +72,46 @@ class PengaturanBiayaController extends GetxController {
   }
 
   Future<void> _fetchSiswaKelas1() async {
+    // Query untuk mendapatkan ID kelas 1 (A-F)
     final kelasSnap = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('kelas')
         .where('namaKelas', whereIn: ['1A', '1B', '1C', '1D', '1E', '1F'])
         .where('tahunAjaran', isEqualTo: configC.tahunAjaranAktif.value)
         .get();
-    
+
     final List<String> kelas1Ids = kelasSnap.docs.map((d) => d.id).toList();
 
-    if (kelas1Ids.isNotEmpty) {
-      final siswaSnap = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('siswa')
-          .where('kelasId', whereIn: kelas1Ids).get();
-      
-      final siswaList = siswaSnap.docs.map((d) => SiswaKeuanganModel.fromFirestore(d)).toList();
-      daftarSiswaKelas1.assignAll(siswaList);
+    // Bersihkan data lama sebelum diisi kembali
+    daftarSiswaKelas1.clear();
+    uangPangkalControllers.values.forEach((c) => c.dispose());
+    uangPangkalControllers.clear();
 
+    if (kelas1Ids.isNotEmpty) {
+      // --- MULAI LOGIKA HOTFIX "CHUNKING" ---
+      List<SiswaKeuanganModel> allSiswaKelas1 = [];
+      const chunkSize = 30;
+
+      for (var i = 0; i < kelas1Ids.length; i += chunkSize) {
+        // Ambil "potongan" ID kelas, maksimal 30
+        final chunk = kelas1Ids.sublist(i, i + chunkSize > kelas1Ids.length ? kelas1Ids.length : i + chunkSize);
+
+        // Jalankan query 'whereIn' untuk potongan tersebut
+        final siswaSnap = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('siswa')
+            .where('kelasId', whereIn: chunk)
+            .get();
+
+        // Tambahkan hasilnya ke list sementara
+        allSiswaKelas1.addAll(
+          siswaSnap.docs.map((d) => SiswaKeuanganModel.fromFirestore(d)).toList()
+        );
+      }
+      // --- SELESAI LOGIKA HOTFIX ---
+
+      // Urutkan hasilnya berdasarkan nama
+      allSiswaKelas1.sort((a, b) => a.namaLengkap.compareTo(b.namaLengkap));
+
+      daftarSiswaKelas1.assignAll(allSiswaKelas1);
+
+      // Siapkan text controllers setelah daftar siswa terisi
       for (var siswa in daftarSiswaKelas1) {
         final nominal = siswa.uangPangkalDitetapkan > 0 ? siswa.uangPangkalDitetapkan : _defaultUangPangkal;
         uangPangkalControllers[siswa.uid] = TextEditingController(text: nominal.toString());

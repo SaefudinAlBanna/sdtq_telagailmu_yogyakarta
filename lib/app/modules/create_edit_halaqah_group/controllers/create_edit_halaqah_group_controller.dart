@@ -18,25 +18,33 @@ class CreateEditHalaqahGroupController extends GetxController {
   final isLoading = true.obs;
   final isSaving = false.obs;
   String? groupId;
+  HalaqahGroupModel? existingGroup;
 
-  // Form State
   final namaGrupC = TextEditingController();
   final Rxn<PegawaiSimpleModel> selectedPengampu = Rxn<PegawaiSimpleModel>();
   final RxList<PegawaiSimpleModel> daftarPengampu = <PegawaiSimpleModel>[].obs;
   final RxList<String> daftarKelas = <String>[].obs;
   final RxString selectedKelasFilter = "".obs;
+  
+  final searchC = TextEditingController();
+  final searchQuery = "".obs;
 
-  // Student Lists State
   final RxList<SiswaSimpleModel> anggotaGrup = <SiswaSimpleModel>[].obs;
   final RxList<SiswaSimpleModel> siswaTersedia = <SiswaSimpleModel>[].obs;
 
   String? _initialPengampuId; 
-  
-  // Helpers
   late String tahunAjaran;
   late String semester;
   late String fieldGrupSiswa;
   List<SiswaSimpleModel> _initialMembers = [];
+
+  List<SiswaSimpleModel> get filteredSiswaTersedia {
+    if (searchQuery.value.isEmpty) return siswaTersedia;
+    return siswaTersedia.where((siswa) => 
+      siswa.nama.toLowerCase().contains(searchQuery.value.toLowerCase())
+    ).toList();
+  }
+
 
 
   @override
@@ -46,58 +54,91 @@ class CreateEditHalaqahGroupController extends GetxController {
     if (argument is HalaqahGroupModel) {
       isEditMode.value = true;
       groupId = argument.id;
+      existingGroup = argument; // Simpan data grup yang diedit
     }
     
     tahunAjaran = configC.tahunAjaranAktif.value;
     semester = configC.semesterAktif.value;
     fieldGrupSiswa = "grupHalaqah.$tahunAjaran\_$semester";
 
-    _loadInitialData(argument as HalaqahGroupModel?);
+    searchC.addListener(() => searchQuery.value = searchC.text);
+    _loadInitialData();
   }
 
-  Future<void> _loadInitialData(HalaqahGroupModel? group) async {
+  Future<void> _loadInitialData() async {
     isLoading.value = true;
     try {
       await _fetchEligiblePengampu();
       await _fetchAvailableClasses();
-      if (isEditMode.value && group != null) {
-        await _loadGroupDataForEdit(group);
+      if (isEditMode.value && existingGroup != null) {
+        await _loadGroupDataForEdit(existingGroup!);
       }
     } catch (e) { Get.snackbar("Error", "Gagal memuat data awal: $e"); } 
     finally { isLoading.value = false; }
   }
 
   Future<void> _fetchEligiblePengampu() async {
-    // [FIX] Ambil SEMUA pegawai terlebih dahulu
-    final snapshot = await _firestore.collection('Sekolah').doc(configC.idSekolah)
-      .collection('pegawai')
-      .get();
+    final snapshot = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('pegawai').get();
+    
+    // 1. Dapatkan daftar ID pengampu yang sudah punya grup
+    final groupSnapshot = await _firestore
+        .collection('Sekolah').doc(configC.idSekolah)
+        .collection('tahunajaran').doc(tahunAjaran)
+        .collection('halaqah_grup').get();
+    
+    final assignedPengampuIds = groupSnapshot.docs.map((doc) => doc.data()['idPengampu'] as String).toSet();
 
-    // [FIX] Lakukan penyaringan di dalam aplikasi untuk fleksibilitas
+    // 2. Filter daftar pengampu
     final List<PegawaiSimpleModel> eligiblePengampu = [];
     for (var doc in snapshot.docs) {
       final data = doc.data();
-      final role = data['role'] as String? ?? '';
       final tugas = List<String>.from(data['tugas'] ?? []);
-
-      // Cek semua kondisi yang Anda berikan
-      if (role == 'Pengampu' || 
-          tugas.contains('Pengampu') || 
-          tugas.contains('Koordinator Halaqah Ikhwan') || 
-          tugas.contains('Koordinator Halaqah Akhwat')) {
-        eligiblePengampu.add(PegawaiSimpleModel.fromFirestore(doc));
+      
+      final bool isPengampuRole = tugas.any((t) => ['Pengampu', 'Koordinator Halaqah Ikhwan', 'Koordinator Halaqah Akhwat'].contains(t));
+      
+      if (isPengampuRole) {
+        // Jika mode edit dan UID pengampu ini adalah pengampu grup yang sedang diedit, izinkan.
+        if (isEditMode.value && doc.id == existingGroup?.idPengampu) {
+            eligiblePengampu.add(PegawaiSimpleModel.fromFirestore(doc));
+        } 
+        // Jika pengampu belum punya grup, izinkan.
+        else if (!assignedPengampuIds.contains(doc.id)) {
+            eligiblePengampu.add(PegawaiSimpleModel.fromFirestore(doc));
+        }
       }
     }
     
-    // Urutkan berdasarkan nama untuk tampilan yang rapi
     eligiblePengampu.sort((a, b) => a.nama.compareTo(b.nama));
-    
     daftarPengampu.assignAll(eligiblePengampu);
   }
 
+  // Future<void> _fetchAvailableClasses() async {
+  //   final snapshot = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('kelas').get();
+  //   daftarKelas.assignAll(snapshot.docs.map((doc) => doc.id).toList()..sort());
+  // }
+
   Future<void> _fetchAvailableClasses() async {
-    final snapshot = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('kelas').get();
-    daftarKelas.assignAll(snapshot.docs.map((doc) => doc.id).toList()..sort());
+    final tahunAjaran = configC.tahunAjaranAktif.value;
+    if (tahunAjaran.isEmpty || tahunAjaran.contains("TIDAK")) {
+      daftarKelas.clear();
+      return;
+    }
+
+    final snapshot = await _firestore
+        .collection('Sekolah')
+        .doc(configC.idSekolah)
+        .collection('tahunajaran')
+        .doc(tahunAjaran)
+        .collection('kelastahunajaran')
+        .get();
+
+    final classNames = snapshot.docs
+        .map((doc) => doc.id.split('-').first)
+        .toSet()
+        .toList();
+
+    classNames.sort();
+    daftarKelas.assignAll(classNames);
   }
 
   Future<void> _loadGroupDataForEdit(HalaqahGroupModel group) async {
@@ -119,6 +160,7 @@ class CreateEditHalaqahGroupController extends GetxController {
   Future<void> fetchAvailableStudentsByClass(String kelasId) async {
     selectedKelasFilter.value = kelasId;
     siswaTersedia.clear();
+    searchC.clear();
 
     // --- [FIX] LANGKAH 1: Ambil SEMUA siswa di kelas, HAPUS filter grupHalaqah ---
     final snapshot = await _firestore.collection('Sekolah').doc(configC.idSekolah)
@@ -157,19 +199,41 @@ class CreateEditHalaqahGroupController extends GetxController {
   }
 
   Future<void> saveGroup() async {
-    // 1. Validasi Input Awal
     if (selectedPengampu.value == null) {
-      Get.snackbar("Peringatan", "Silakan pilih pengampu terlebih dahulu.");
-      return;
+      Get.snackbar("Peringatan", "Silakan pilih pengampu."); return;
     }
     if (namaGrupC.text.trim().isEmpty) {
-      Get.snackbar("Peringatan", "Nama grup tidak boleh kosong.");
-      return;
+      Get.snackbar("Peringatan", "Nama grup tidak boleh kosong."); return;
     }
     
     isSaving.value = true;
     try {
-      // 2. Inisialisasi Batch dan Referensi
+      // Validasi Ganda sebelum commit
+      final checkSnapshot = await _firestore
+          .collection('Sekolah').doc(configC.idSekolah)
+          .collection('tahunajaran').doc(tahunAjaran)
+          .collection('halaqah_grup')
+          .where('idPengampu', isEqualTo: selectedPengampu.value!.uid).get();
+
+      bool isAlreadyAssigned = false;
+      if (checkSnapshot.docs.isNotEmpty) {
+        if (isEditMode.value) {
+          // Jika mode edit, pastikan dokumen yang ditemukan bukan dokumen yang sedang kita edit
+          if (checkSnapshot.docs.first.id != groupId) {
+            isAlreadyAssigned = true;
+          }
+        } else {
+          // Jika mode create, setiap dokumen yang ditemukan berarti sudah ada
+          isAlreadyAssigned = true;
+        }
+      }
+
+      if (isAlreadyAssigned) {
+        Get.snackbar("Gagal", "Pengampu yang dipilih sudah memiliki grup lain.");
+        isSaving.value = false;
+        return;
+      }
+      
       final WriteBatch batch = _firestore.batch();
       final groupRef = _firestore.collection('Sekolah').doc(configC.idSekolah)
         .collection('tahunajaran').doc(tahunAjaran)
@@ -201,7 +265,15 @@ class CreateEditHalaqahGroupController extends GetxController {
         });
         // Perbarui field di dokumen utama siswa
         batch.update(_firestore.collection('Sekolah').doc(configC.idSekolah).collection('siswa').doc(siswa.uid), {
-          fieldGrupSiswa: groupRef.id
+          // 'fieldGrupSiswa' akan menjadi 'grupHalaqah.2025-2026_1' misalnya
+          fieldGrupSiswa: groupRef.id, 
+          // [BARU] Simpan data grup yang sudah didenormalisasi
+          'grupHalaqah': {
+            'idGrup': groupRef.id,
+            'namaGrup': namaGrupC.text.trim(),
+            'idPengampu': selectedPengampu.value!.uid,
+            'namaPengampu': selectedPengampu.value!.nama,
+          }
         });
       }
       
@@ -210,7 +282,8 @@ class CreateEditHalaqahGroupController extends GetxController {
         batch.delete(groupRef.collection('anggota').doc(siswa.uid));
         // Hapus field dari dokumen utama siswa
         batch.update(_firestore.collection('Sekolah').doc(configC.idSekolah).collection('siswa').doc(siswa.uid), {
-          fieldGrupSiswa: FieldValue.delete()
+          fieldGrupSiswa: FieldValue.delete(),
+          'grupHalaqah': FieldValue.delete(), // [BARU] Hapus juga map denormalisasi
         });
       }
       
@@ -249,6 +322,7 @@ class CreateEditHalaqahGroupController extends GetxController {
   @override
   void onClose() {
     namaGrupC.dispose();
+    searchC.dispose();
     super.onClose();
   }
 }

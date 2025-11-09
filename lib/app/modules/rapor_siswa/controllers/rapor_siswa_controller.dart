@@ -1,152 +1,375 @@
-// app/modules/rapor_siswa/controllers/rapor_siswa_controller.dart
+// lib/app/modules/rapor_siswa/controllers/rapor_siswa_controller.dart (SUDAH DIPERBAIKI)
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+
+import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import '../../../services/pdf_helper_service.dart';
 
-// Model sederhana untuk menampung hasil olahan nilai per mapel
-// class RaporMapel {
-//   String namaMapel;
-//   double nilaiAkhir;
-//   String capaianKompetensi;
-
-//   RaporMapel({
-//     required this.namaMapel,
-//     required this.nilaiAkhir,
-//     required this.capaianKompetensi,
-//   });
-// }
+import '../../../controllers/config_controller.dart';
+import '../../../models/rapor_model.dart';
+import '../../../models/siswa_model.dart';
 
 class RaporSiswaController extends GetxController {
-//   final Map<String, dynamic> args = Get.arguments; // Terima data siswa (idSiswa, namaSiswa, idKelas, dll)
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final ConfigController configC = Get.find<ConfigController>();
 
-//   var isLoading = true.obs;
+  final RxBool isLoading = true.obs;
+  final RxBool isGenerating = false.obs;
+  final Rxn<RaporModel> raporData = Rxn<RaporModel>();
+
+  final RxBool isPrinting = false.obs;
+  final RxBool isSharing = false.obs;
+  final RxBool isUpdating = false.obs;
+
+  late SiswaModel siswa;
+  late String kelasId, semesterId, tahunAjaranId;
+
+  @override
+  void onInit() {
+    super.onInit();
+    _initializeData();
+  }
   
-//   // Variabel untuk menampung semua data rapor yang sudah matang
-//   Rx<Map<String, dynamic>> dataSiswa = Rx({});
-//   RxList<RaporMapel> daftarNilaiRapor = <RaporMapel>[].obs;
-//   Rx<Map<String, dynamic>> dataPendukungRapor = Rx({});
+  void _initializeData() {
+    isLoading.value = true;
+    try {
+      final args = Get.arguments as Map<String, dynamic>? ?? {};
+      siswa = args['siswa'];
+      kelasId = args['kelasId'];
+      semesterId = args['semesterId'];
+      tahunAjaranId = configC.tahunAjaranAktif.value;
 
-//   FirebaseFirestore firestore = FirebaseFirestore.instance;
-//   // Path-path dasar bisa Anda ambil dari argumen
-//   late String basePath; 
-
-//   @override
-//   void onInit() {
-//     super.onInit();
-//     // Path dasar menuju data siswa di semester ini
-//     basePath = "/Sekolah/P9984539/tahunajaran/2024-2025/kelastahunajaran/${args['idKelas']}/daftarsiswa/${args['idsiswa']}/Semester/Semester I";
-    
-//     fetchRaporData();
-//   }
-
-//   // Di dalam RaporSiswaController
-
-// // import 'package:pdf/widgets.dart' as pw;
-// // import 'package:printing/printing.dart';
-
-// Future<void> generatePdfRapor() async {
-//   final doc = pw.Document();
-
-//   // Ambil data yang sudah ada
-//   final listNilai = daftarNilaiRapor; 
-  
-//   doc.addPage(
-//     pw.Page(
-//       build: (pw.Context context) {
-//         return pw.Column(
-//           crossAxisAlignment: pw.CrossAxisAlignment.start,
-//           children: [
-//             // Header
-//             pw.Text("Rapor Siswa", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 20)),
-//             pw.SizedBox(height: 20),
-//             pw.Text("Nama: ${dataSiswa.value['namasiswa']}"),
-//             // ... header lainnya ...
-//             pw.SizedBox(height: 20),
-            
-//             // Tabel Nilai
-//             pw.Table.fromTextArray(
-//               headers: ['No', 'Mata Pelajaran', 'Nilai Akhir', 'Capaian Kompetensi'],
-//               data: List<List<String>>.generate(
-//                 listNilai.length, 
-//                 (index) => [
-//                   (index+1).toString(),
-//                   listNilai[index].namaMapel,
-//                   listNilai[index].nilaiAkhir.toStringAsFixed(1),
-//                   listNilai[index].capaianKompetensi,
-//                 ]
-//               ),
-//             ),
-//              pw.SizedBox(height: 20),
-//             pw.Text("Catatan Wali Kelas:", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-//             pw.Text(dataPendukungRapor.value['catatanWaliKelas'] ?? ''),
-//           ]
-//         );
-//       },
-//     ),
-//   );
-
-//   // Tampilkan preview cetak
-//   await Printing.layoutPdf(onLayout: (format) async => doc.save());
-// }
-
-//   Future<void> fetchRaporData() async {
-//     try {
-//       isLoading.value = true;
+      _loadExistingRapor(); 
       
-//       // 1. Ambil daftar mata pelajaran siswa
-//       QuerySnapshot mapelSnapshot = await firestore.collection('$basePath/matapelajaran').get();
-//       List<String> daftarMapelIds = mapelSnapshot.docs.map((doc) => doc.id).toList();
+      if (kelasId.isEmpty || semesterId.isEmpty) {
+        throw Exception("ID Kelas atau Semester tidak valid.");
+      }
 
-//       // 2. Loop setiap mata pelajaran untuk mengolah nilainya
-//       List<RaporMapel> hasilOlahNilai = [];
-//       for (String idMapel in daftarMapelIds) {
-//         QuerySnapshot nilaiSnapshot = await firestore
-//             .collection('$basePath/matapelajaran/$idMapel/nilai')
-//             .where('jenisNilai', isEqualTo: 'Sumatif') // Hanya ambil nilai sumatif
-//             .get();
+    } catch (e) {
+      Get.snackbar("Error Kritis", "Gagal memuat data awal rapor: ${e.toString()}");
+    } finally {
+      isLoading.value = false;
+    }
+  }
 
-//         if (nilaiSnapshot.docs.isNotEmpty) {
-//           double totalNilai = 0;
-//           List<String> deskripsiList = [];
-          
-//           for (var doc in nilaiSnapshot.docs) {
-//             totalNilai += (doc.data() as Map)['nilai'];
-//             if ((doc.data() as Map)['deskripsi'] != null && (doc.data() as Map)['deskripsi'].isNotEmpty) {
-//               deskripsiList.add((doc.data() as Map)['deskripsi']);
-//             }
-//           }
-          
-//           double rataRata = totalNilai / nilaiSnapshot.docs.length;
-//           String capaian = deskripsiList.join('. '); // Gabungkan semua deskripsi
+  void confirmAndUpdateRapor() {
+    Get.defaultDialog(
+      title: "Perbarui Rapor?",
+      middleText: "Anda yakin ingin memperbarui rapor dengan data terbaru? Semua nilai, absensi, dan catatan akan diambil ulang dari sistem. Tindakan ini tidak dapat dibatalkan.",
+      textConfirm: "Ya, Perbarui",
+      textCancel: "Batal",
+      confirmTextColor: Colors.white,
+      onConfirm: () {
+        Get.back(); // Tutup dialog
+        // Panggil fungsi generateRapor yang sudah ada, tapi dengan state loading yang berbeda
+        _updateRapor(); 
+      },
+    );
+  }
 
-//           hasilOlahNilai.add(RaporMapel(
-//             namaMapel: idMapel, 
-//             nilaiAkhir: rataRata, 
-//             capaianKompetensi: capaian.isEmpty ? 'Capaian kompetensi sudah baik.' : capaian,
-//           ));
-//         }
-//       }
-//       daftarNilaiRapor.value = hasilOlahNilai;
-      
-//       // 3. Ambil data pendukung (absensi, catatan, dll)
-//       // Ini asumsi hanya ada 1 dokumen di koleksi raporData
-//       QuerySnapshot raporDataSnapshot = await firestore.collection('$basePath/raporData').limit(1).get();
-//       if(raporDataSnapshot.docs.isNotEmpty){
-//         dataPendukungRapor.value = raporDataSnapshot.docs.first.data() as Map<String, dynamic>;
-//       }
+  Future<void> _updateRapor() async {
+    isUpdating.value = true;
+    await generateRapor(); // Kita gunakan kembali mesin utama kita
+    isUpdating.value = false;
+  }
 
-//       // 4. Set data siswa
-//       dataSiswa.value = args;
+  Future<void> _loadExistingRapor() async {
+    final raporId = '${siswa.uid}_$semesterId';
+    final raporRef = _firestore
+        .collection('Sekolah').doc(configC.idSekolah)
+        .collection('tahunajaran').doc(tahunAjaranId)
+        .collection('kelastahunajaran').doc(kelasId)
+        .collection('rapor').doc(raporId);
 
-//     } catch (e) {
-//       Get.snackbar("Error", "Gagal memuat data rapor: $e");
-//       print(e);
-//     } finally {
-//       isLoading.value = false;
-//     }
-//   }
+    final doc = await raporRef.get();
+    if (doc.exists) {
+      raporData.value = RaporModel.fromFirestore(doc);
+    }
+  }
 
+  Future<void> toggleShareRapor() async {
+    if (raporData.value == null) return;
+
+    isSharing.value = true;
+    try {
+      final bool newStatus = !raporData.value!.isShared;
+      final raporId = raporData.value!.id;
+
+      final raporRef = _firestore
+          .collection('Sekolah').doc(configC.idSekolah)
+          .collection('tahunajaran').doc(tahunAjaranId)
+          .collection('kelastahunajaran').doc(kelasId)
+          .collection('rapor').doc(raporId);
+
+      await raporRef.update({'isShared': newStatus});
+
+      // Update state lokal
+      raporData.value = raporData.value!.copyWith(isShared: newStatus);
+
+      if (newStatus) {
+        // await NotifikasiService.kirimNotifikasi(...);
+      }
+      Get.snackbar("Berhasil", newStatus ? "Rapor telah dibagikan." : "Pembagian rapor dibatalkan.");
+
+    } catch (e) { Get.snackbar("Error", "Gagal mengubah status: $e"); } 
+    finally { isSharing.value = false; }
+  }
   
+ Future<void> generateRapor() async {
+    isGenerating.value = true;
+    try {
+      final results = await Future.wait([
+        _fetchNilaiAkademik(),
+        _fetchRekapAbsensi(),
+        _fetchDataPengembanganDiri(),
+        _fetchCatatanWaliKelas(),
+      ]);
+
+      final List<NilaiMapelRapor> daftarNilai = results[0] as List<NilaiMapelRapor>;
+      final RekapAbsensi rekapAbsensi = results[1] as RekapAbsensi;
+      final Map<String, dynamic> dataPengembangan = results[2] as Map<String, dynamic>;
+      final String namaOrtu = dataPengembangan['namaOrangTua'] as String;
+      final String catatanWalas = results[3] as String;
+      final DataHalaqahRapor dataHalaqah = dataPengembangan['halaqah'] as DataHalaqahRapor;
+      final List<DataEkskulRapor> daftarEkskul = dataPengembangan['ekskul'] as List<DataEkskulRapor>;
+
+      final RaporModel hasilRapor = RaporModel(
+        id: '${siswa.uid}_$semesterId',
+        idSekolah: configC.idSekolah,
+        idTahunAjaran: tahunAjaranId,
+        idKelas: kelasId,
+        semester: semesterId,
+        tanggalGenerate: DateTime.now(),
+        idWaliKelas: configC.infoUser['uid'],
+        namaWaliKelas: configC.infoUser['alias'] ?? configC.infoUser['nama'],
+        idSiswa: siswa.uid,
+        namaSiswa: siswa.namaLengkap,
+        nisn: siswa.nisn,
+        namaOrangTua: namaOrtu,
+        daftarNilaiMapel: daftarNilai,
+        dataHalaqah: dataHalaqah,
+        daftarEkskul: daftarEkskul,
+        rekapAbsensi: rekapAbsensi,
+        // catatanWaliKelas: "Terus tingkatkan semangat belajar ya sholih-sholihah, dan jangan ragu untuk bertanya.",
+        catatanWaliKelas: catatanWalas,
+      );
+      
+      await _saveRaporToFirestore(hasilRapor);
+      raporData.value = hasilRapor;
+      Get.snackbar("Berhasil", "Rapor digital untuk ${siswa.namaLengkap} berhasil digenerate.");
+      
+    } catch (e) {
+      Get.snackbar("Error", "Gagal membuat rapor: ${e.toString()}");
+    } finally {
+      isGenerating.value = false;
+    }
+  }
+
+  Future<String> _fetchCatatanWaliKelas() async {
+    try {
+      final semesterDocRef = _firestore
+          .collection('Sekolah').doc(configC.idSekolah)
+          .collection('tahunajaran').doc(tahunAjaranId)
+          .collection('kelastahunajaran').doc(kelasId)
+          .collection('daftarsiswa').doc(siswa.uid)
+          .collection('semester').doc(semesterId);
+
+      final doc = await semesterDocRef.get();
+
+      if (doc.exists && doc.data() != null) {
+        final catatan = doc.data()!['catatanWaliKelas'] as String?;
+        if (catatan != null && catatan.isNotEmpty) {
+          return catatan;
+        }
+      }
+      // Jika dokumen/field tidak ada, atau field kosong, kembalikan placeholder
+      return "Terus tingkatkan semangat belajar ya sholih-sholihah, dan jangan ragu untuk bertanya.";
+    } catch (e) {
+      print("### Error fetching catatan walas: $e");
+      return "Gagal memuat catatan."; // Fallback jika terjadi error
+    }
+  }
+
+  // --- FUNGSI-FUNGSI PEMBANTU (Tidak ada perubahan di sini) ---
+  Future<List<NilaiMapelRapor>> _fetchNilaiAkademik() async {
+    final snapshot = await _firestore
+      .collection('Sekolah').doc(configC.idSekolah)
+      .collection('tahunajaran').doc(tahunAjaranId)
+      .collection('kelastahunajaran').doc(kelasId)
+      .collection('daftarsiswa').doc(siswa.uid)
+      .collection('semester').doc(semesterId)
+      .collection('matapelajaran')
+      .get();
+      
+    if (snapshot.docs.isEmpty) return [];
+
+    return snapshot.docs.map((doc) {
+      final data = doc.data();
+      return NilaiMapelRapor(
+        idMapel: doc.id,
+        namaMapel: data['namaMapel'] ?? 'Tanpa Nama',
+        namaGuru: data['namaGuru'] ?? 'N/A',
+        nilaiAkhir: (data['nilai_akhir'] as num?)?.toDouble() ?? 0.0,
+        deskripsiCapaian: data['deskripsi_capaian'] ?? 'Capaian belum diisi.',
+      );
+    }).toList();
+  }
+
+  Future<RekapAbsensi> _fetchRekapAbsensi() async {
+    // 1. Controller ini menunjuk ke path yang SANGAT SPESIFIK:
+    final snapshot = await _firestore
+        .collection('Sekolah').doc(configC.idSekolah)
+        .collection('tahunajaran').doc(tahunAjaranId)
+        .collection('kelastahunajaran').doc(kelasId)
+        .collection('daftarsiswa').doc(siswa.uid) // <-- Hanya untuk siswa ini
+        .collection('semester').doc(semesterId)
+        .collection('absensi_siswa') // <-- Koleksi absensi individual
+        .get();
+
+    if (snapshot.docs.isEmpty) return RekapAbsensi(sakit: 0, izin: 0, alpa: 0);
+
+    // 2. Ia lalu menghitung total S, I, A dari semua dokumen di koleksi tersebut.
+    int sakit = 0, izin = 0, alpa = 0;
+    for (var doc in snapshot.docs) {
+      final status = doc.data()['status'] as String?;
+      if (status == 'Sakit') sakit++;
+      else if (status == 'Izin') izin++;
+      else if (status == 'Alpa') alpa++;
+    }
+
+    return RekapAbsensi(sakit: sakit, izin: izin, alpa: alpa);
+  }
+
+  Future<Map<String, dynamic>> _fetchDataPengembanganDiri() async {
+    // 1. Ambil dokumen utama siswa (ini sudah kita lakukan dan ini adalah langkah KUNCI)
+    final siswaDoc = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('siswa').doc(siswa.uid).get();
+    final siswaData = siswaDoc.data() ?? {};
+    final String namaOrtu = siswaData['namaAyah'] ?? siswaData['namaIbu'] ?? 'Orang Tua/Wali';
+
+    // --- Logika Halaqah (tidak berubah, sudah benar) ---
+    final tingkatanMap = siswaData['halaqahTingkatan'] as Map<String, dynamic>? ?? {};
+    final setoranTerakhirMap = siswaData['setoranTerakhirHalaqah'] as Map<String, dynamic>? ?? {};
+    final tugasMap = setoranTerakhirMap['tugas'] as Map<String, dynamic>? ?? {};
+    final raporHalaqahMap = siswaData['raporHalaqahSemester'] as Map<String, dynamic>? ?? {};
+    final dataSemesterIni = raporHalaqahMap[semesterId] as Map<String, dynamic>? ?? {};
+
+    final String tingkatan = tingkatanMap['nama'] ?? 'Belum ada tingkatan';
+    String pencapaian = "Sabak: ${tugasMap['sabak'] ?? '-'} | Sabqi: ${tugasMap['sabqi'] ?? '-'}";
+    if (pencapaian == "Sabak: - | Sabqi: -") pencapaian = "Belum ada setoran terakhir.";
+
+    final dataHalaqah = DataHalaqahRapor(
+      tingkatan: tingkatan,
+      pencapaian: pencapaian,
+      nilaiAkhir: dataSemesterIni['nilai'] as int?,
+      catatan: dataSemesterIni['catatan'] as String? ?? 'Belum ada catatan akhir dari pengampu.',
+    );
+
+    // --- [LOGIKA FINAL EKSKUL - SANGAT EFISIEN] ---
+    List<DataEkskulRapor> daftarEkskul = [];
+    try {
+      // a. Baca map 'ekskulTerdaftar' langsung dari data siswa yang sudah kita ambil
+      final ekskulTerdaftarMap = siswaData['ekskulTerdaftar'] as Map<String, dynamic>? ?? {};
+
+      // b. Ambil semua ID ekskul dari keys map tersebut
+      final List<String> idIkutEkskul = ekskulTerdaftarMap.keys.toList();
+
+      // c. Jika siswa terdaftar di ekskul, ambil detailnya
+      if (idIkutEkskul.isNotEmpty) {
+        final ekskulDetailsSnap = await _firestore
+            .collection('Sekolah').doc(configC.idSekolah)
+            .collection('ekskul_ditawarkan')
+            .where(FieldPath.documentId, whereIn: idIkutEkskul)
+            .get();
+
+        daftarEkskul = ekskulDetailsSnap.docs.map((doc) {
+          final data = doc.data();
+          return DataEkskulRapor(
+            namaEkskul: data['namaEkskul'] ?? 'Tanpa Nama',
+            nilai: 'Baik', // Placeholder
+            catatan: 'Aktif mengikuti kegiatan.', // Placeholder
+          );
+        }).toList();
+      }
+    } catch (e) {
+      print("### Error fetching ekskul data from denormalized field: $e");
+      // Biarkan daftarEkskul kosong jika terjadi error
+    }
+    // --- [AKHIR LOGIKA FINAL EKSKUL] ---
+
+    return {
+      'halaqah': dataHalaqah,
+      'ekskul': daftarEkskul,
+      'namaOrangTua': namaOrtu,
+    };
+  }
+
+  Future<void> exportRaporPdf() async {
+    if (raporData.value == null) {
+      Get.snackbar("Peringatan", "Data rapor belum tersedia untuk dicetak.");
+      return;
+    }
+    isPrinting.value = true;
+    try {
+      final doc = pw.Document();
+      
+      // 1. Muat semua aset yang dibutuhkan
+      final boldFont = await PdfGoogleFonts.poppinsBold();
+      final regularFont = await PdfGoogleFonts.poppinsRegular();
+      final italicFont = await PdfGoogleFonts.poppinsItalic();
+      final logoImage = pw.MemoryImage((await rootBundle.load('assets/png/logo.png')).buffer.asUint8List());
+      
+      // 2. Ambil data info sekolah
+      final infoSekolahDoc = await _firestore.collection('Sekolah').doc(configC.idSekolah).get();
+      final infoSekolah = infoSekolahDoc.data() ?? {};
+      
+      // 3. Panggil service untuk membangun konten rapor
+      final content = await PdfHelperService.buildRaporDigitalContent(
+        rapor: raporData.value!,
+        regularFont: regularFont,
+        boldFont: boldFont,
+        italicFont: italicFont,
+      );
+
+      // 4. Rakit dokumen PDF
+      doc.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          header: (context) => PdfHelperService.buildHeaderA4(
+            infoSekolah: infoSekolah, logoImage: logoImage, 
+            boldFont: boldFont, regularFont: regularFont
+          ),
+          footer: (context) => PdfHelperService.buildFooter(context, regularFont),
+          build: (context) => content,
+        ),
+      );
+
+      // 5. Bagikan atau simpan PDF
+      await Printing.sharePdf(
+        bytes: await doc.save(),
+        filename: 'rapor_${raporData.value!.namaSiswa}_${raporData.value!.idTahunAjaran}.pdf'
+      );
+
+    } catch (e) {
+      Get.snackbar("Error", "Gagal membuat PDF: $e");
+    } finally {
+      isPrinting.value = false;
+    }
+  }
+
+
+  Future<void> _saveRaporToFirestore(RaporModel rapor) async {
+    final raporRef = _firestore
+        .collection('Sekolah').doc(configC.idSekolah)
+        .collection('tahunajaran').doc(tahunAjaranId)
+        .collection('kelastahunajaran').doc(kelasId)
+        .collection('rapor').doc(rapor.id);
+        
+    await raporRef.set(rapor.toJson());
+  }
 }

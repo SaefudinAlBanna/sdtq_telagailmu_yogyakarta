@@ -116,6 +116,11 @@ abstract class Routes {
   static const MANAJEMEN_KATEGORI_KEUANGAN = _Paths.MANAJEMEN_KATEGORI_KEUANGAN;
   static const LAPORAN_KEUANGAN_SEKOLAH = _Paths.LAPORAN_KEUANGAN_SEKOLAH;
   static const MANAJEMEN_ANGGARAN = _Paths.MANAJEMEN_ANGGARAN;
+  static const HALAQAH_DASHBOARD = _Paths.HALAQAH_DASHBOARD;
+  static const MANAJEMEN_PENGUJI = _Paths.MANAJEMEN_PENGUJI;
+  static const PENJADWALAN_UJIAN = _Paths.PENJADWALAN_UJIAN;
+  static const MANAJEMEN_TINGKATAN_SISWA = _Paths.MANAJEMEN_TINGKATAN_SISWA;
+  static const JADWAL_UJIAN_PENGUJI = _Paths.JADWAL_UJIAN_PENGUJI;
 }
 
 abstract class _Paths {
@@ -230,4 +235,9 @@ abstract class _Paths {
   static const MANAJEMEN_KATEGORI_KEUANGAN = '/manajemen-kategori-keuangan';
   static const LAPORAN_KEUANGAN_SEKOLAH = '/laporan-keuangan-sekolah';
   static const MANAJEMEN_ANGGARAN = '/manajemen-anggaran';
+  static const HALAQAH_DASHBOARD = '/halaqah-dashboard';
+  static const MANAJEMEN_PENGUJI = '/manajemen-penguji';
+  static const PENJADWALAN_UJIAN = '/penjadwalan-ujian';
+  static const MANAJEMEN_TINGKATAN_SISWA = '/manajemen-tingkatan-siswa';
+  static const JADWAL_UJIAN_PENGUJI = '/jadwal-ujian-penguji';
 }

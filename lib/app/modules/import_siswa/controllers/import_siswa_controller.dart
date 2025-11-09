@@ -2,6 +2,7 @@
 
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -9,11 +10,16 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sdtq_telagailmu_yogyakarta/app/controllers/config_controller.dart';
 
+import 'dart:io' show Platform; // Untuk deteksi OS (Windows, Android, dll)
+import 'package:flutter/foundation.dart' show kIsWeb; // Untuk deteksi Web
+
 class ImportSiswaController extends GetxController {
   // --- DEPENDENSI ---
   final ConfigController configC = Get.find<ConfigController>();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  final isPasswordVisible = false.obs;
   
   // --- STATE UI & PROSES ---
   final isLoading = false.obs;
@@ -67,99 +73,165 @@ class ImportSiswaController extends GetxController {
       Get.snackbar("Gagal", "Silakan pilih file Excel terlebih dahulu.");
       return;
     }
+
     Get.defaultDialog(
       title: 'Verifikasi Admin',
-      content: TextField(controller: passAdminC, obscureText: true, autofocus: true, decoration: const InputDecoration(labelText: 'Password Admin')),
-      actions: [
-        OutlinedButton(onPressed: () => Get.back(), child: const Text('Batal')),
-        ElevatedButton(onPressed: _processExcel, child: const Text('Mulai Import')),
-      ],
+      content: Column(
+        mainAxisSize: MainAxisSize.min, // Agar kolom tidak terlalu besar
+        children: [
+          const Text('Masukkan password Anda untuk melanjutkan.'),
+          const SizedBox(height: 16),
+          // Ganti TextField sederhana dengan Obx
+          Obx(() => TextField(
+                controller: passAdminC,
+                obscureText: !isPasswordVisible.value, // <-- hubungkan ke state
+                autocorrect: false,
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(),
+                  labelText: 'Password Admin',
+                  suffixIcon: IconButton( // <-- tambahkan ikon mata
+                    icon: Icon(
+                      isPasswordVisible.value
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
+                    onPressed: () {
+                      isPasswordVisible.toggle(); // <-- aksi untuk mengubah state
+                    },
+                  ),
+                ),
+              )),
+        ],
+      ),
+      confirm: Obx(() => ElevatedButton(
+            onPressed: isLoading.value ? null : _processExcel,
+            child: Text(isLoading.value ? 'MEMPROSES...' : 'Mulai Import'),
+          )),
+      cancel: TextButton(onPressed: () => Get.back(), child: const Text('Batal')),
     );
   }
 
   Future<void> _processExcel() async {
-    isLoading.value = true;
-    Get.back();
-    final adminEmail = _auth.currentUser?.email;
-    final adminPassword = passAdminC.text;
-
-    if (adminEmail == null || adminPassword.isEmpty) {
-      Get.snackbar('Gagal', 'Sesi admin tidak valid atau password kosong.');
-      isLoading.value = false;
+    // ---- VALIDASI AWAL ----
+    if (passAdminC.text.isEmpty) {
+      Get.snackbar("Gagal", "Password admin wajib diisi.");
       return;
     }
 
+    final String? emailAdmin = _auth.currentUser?.email;
+    if (emailAdmin == null) {
+      Get.snackbar("Error", "Sesi admin tidak valid. Silakan login ulang.");
+      return;
+    }
+    
+    // ---- PERSIAPAN PROSES ----
+    isLoading.value = true;
+    
+    // [PERBAIKAN KUNCI 1] AKTIFKAN MODE SENYAP
+    // Ini akan mencegah ConfigController bereaksi terhadap perubahan auth sementara.
     configC.isCreatingNewUser.value = true;
+    
+    final adminPassword = passAdminC.text;
 
     try {
-      await _auth.currentUser!.reauthenticateWithCredential(EmailAuthProvider.credential(email: adminEmail, password: adminPassword));
-      
+      // ---- BACA FILE EXCEL ----
+      // Catatan: Kode ini untuk platform Mobile/Desktop (dart:io).
+      // Untuk web, Anda perlu menggunakan `pickedFile.value!.bytes`.
       var bytes = File(pickedFile.value!.path!).readAsBytesSync();
       var excel = Excel.decodeBytes(bytes);
       var sheet = excel.tables[excel.tables.keys.first]!;
       
+      // Validasi Header Excel
       if (sheet.rows.isEmpty || 
           sheet.rows.first[0]?.value.toString().trim() != 'NISN' ||
           sheet.rows.first[1]?.value.toString().trim() != 'Nama' ||
           sheet.rows.first[2]?.value.toString().trim() != 'SPP') {
-        throw Exception("Format file tidak sesuai. Header harus: NISN, Nama, SPP.");
+        throw Exception("Format file tidak sesuai. Pastikan kolom: NISN, Nama, SPP.");
       }
       
       totalRows.value = sheet.maxRows - 1;
 
+      // ---- PROSES PERULANGAN SETIAP BARIS ----
       for (var i = 1; i < sheet.maxRows; i++) {
         processedRows.value = i;
         var row = sheet.rows[i];
+
         final nisn = row[0]?.value?.toString().trim();
         final nama = row[1]?.value?.toString().trim();
         final spp = num.tryParse(row[2]?.value?.toString().trim() ?? '') ?? 0;
 
         if (nisn == null || nama == null || nisn.isEmpty || nama.isEmpty) {
           errorCount.value++;
-          errorDetails.add("Baris ${i + 1}: Data NISN/Nama kosong.");
+          errorDetails.add("Baris ${i + 1}: Data NISN/Nama tidak valid.");
           continue;
         }
 
-        final String emailSiswa = "$nisn@telagailmu.com";
+        final String emailPalsu = "$nisn@telagailmu.com"; // Sesuaikan domain jika perlu
 
         try {
-          UserCredential siswaCredential = await _auth.createUserWithEmailAndPassword(email: emailSiswa, password: 'telagailmu');
+          // ---- SIKLUS UTAMA PER SISWA ----
+          // 1. Buat user (sesi berpindah ke siswa)
+          UserCredential siswaCredential = await _auth.createUserWithEmailAndPassword(
+            email: emailPalsu,
+            password: 'telagailmu' // Password default
+          );
           
-          // --- PERBAIKAN KRUSIAL: REBUT KEMBALI SESI ADMIN DI DALAM LOOP ---
-          await _auth.signInWithEmailAndPassword(email: adminEmail, password: adminPassword);
+          // 2. Rebut kembali sesi Admin (sesi kembali ke admin)
+          await _auth.signInWithEmailAndPassword(email: emailAdmin, password: adminPassword);
           
+          // 3. Simpan data ke Firestore (operasi aman sebagai admin)
           String uidSiswa = siswaCredential.user!.uid;
-          final dataToSave = {
-              "uid": uidSiswa, "nisn": nisn, "namaLengkap": nama, "email": emailSiswa, "spp": spp,
-              "isProfileComplete": false, "mustChangePassword": true, "statusSiswa": "Aktif",
-              "createdAt": FieldValue.serverTimestamp(), "createdBy": adminEmail,
+          await _firestore.collection("Sekolah").doc(configC.idSekolah).collection('siswa').doc(uidSiswa).set({
+              "uid": uidSiswa,
+              "nisn": nisn,
+              "namaLengkap": nama, // Sesuaikan field 'nama' menjadi 'namaLengkap'
+              "email": emailPalsu,
+              "spp": spp,
+              "mustChangePassword": true, // Ganti nama field agar konsisten
+              "statusSiswa": "Aktif", // Ganti nama field
+              "isProfileComplete": false, // Tambah field agar konsisten
+              "createdAt": FieldValue.serverTimestamp(), // Ganti nama field
+              "createdBy": emailAdmin, // Ganti nama field
               'kelasId': null,
-          };
-          await _firestore.collection("Sekolah").doc(configC.idSekolah).collection('siswa').doc(uidSiswa).set(dataToSave);
+
+          //     'namaLengkap': nama, 'nisn': nisn, 'spp': spp, 'email': emailPalsu,
+          // 'isProfileComplete': false, 'mustChangePassword': true, 'statusSiswa': "Aktif",
+          // 'createdAt': FieldValue.serverTimestamp(), 'createdBy': emailAdmin, 'uid': uidSiswa,
+          // 'kelasId': null,
+          });
           successCount.value++;
           
         } on FirebaseAuthException catch (e) {
             errorCount.value++;
-            String errorMsg = e.code == 'email-already-in-use' ? "NISN (email) sudah ada." : "Gagal membuat user Auth.";
+            String errorMsg = e.code == 'email-already-in-use' ? "NISN (email) sudah terdaftar." : "Gagal membuat user.";
             errorDetails.add("Baris ${i + 1} ($nisn): $errorMsg");
-            // Pastikan sesi admin tetap aktif bahkan jika ada error
-            await _auth.signInWithEmailAndPassword(email: adminEmail, password: adminPassword);
+            
+            // Coba pulihkan sesi admin jika pembuatan user gagal
+            await _auth.signInWithEmailAndPassword(email: emailAdmin, password: adminPassword);
         }
       }
       
+      // ---- PROSES SELESAI ----
+      Get.back(); // Tutup dialog password
       Get.snackbar("Selesai", "Proses import selesai. ${successCount.value} berhasil, ${errorCount.value} gagal.", duration: const Duration(seconds: 5));
 
     } catch (e) {
-      Get.snackbar("Error Fatal", "Proses dihentikan: ${e.toString()}");
+      // ---- PENANGANAN ERROR FATAL ----
+      Get.back(); // Tutup dialog password jika masih terbuka
+      resetState();
+      Get.snackbar("Error Fatal", "Gagal memproses file: ${e.toString()}");
     } finally {
+      // ---- PEMBERSIHAN ----
       isLoading.value = false;
       passAdminC.clear();
+      
+      // [PERBAIKAN KUNCI 2] MATIKAN MODE SENYAP
+      // Kembalikan ConfigController ke mode normal setelah semua selesai.
       configC.isCreatingNewUser.value = false;
     }
   }
 
   Future<void> downloadTemplate() async {
-    // ... (fungsi downloadTemplate tidak berubah)
     isDownloading.value = true;
     try {
       var excel = Excel.createExcel();

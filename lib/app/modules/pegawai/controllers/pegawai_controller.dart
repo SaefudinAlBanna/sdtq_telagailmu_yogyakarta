@@ -80,9 +80,16 @@ class PegawaiController extends GetxController {
     } else {
       var filtered = _semuaPegawai.where((pegawai) {
         final String nama = pegawai.nama.toLowerCase();
+        final String alias = pegawai.alias?.toLowerCase() ?? '';
         final String role = pegawai.role.displayName.toLowerCase();
-        // Pencarian bisa ditambahkan untuk tugas jika perlu
-        return nama.contains(query) || role.contains(query);
+        
+        // [BARU] Gabungkan semua tugas menjadi satu string untuk pencarian
+        final String tugasString = pegawai.tugas.join(' ').toLowerCase();
+  
+        return nama.contains(query) || 
+               alias.contains(query) || 
+               role.contains(query) || 
+               tugasString.contains(query); // <-- Cari di dalam tugas juga
       }).toList();
       daftarPegawaiFiltered.assignAll(filtered);
     }

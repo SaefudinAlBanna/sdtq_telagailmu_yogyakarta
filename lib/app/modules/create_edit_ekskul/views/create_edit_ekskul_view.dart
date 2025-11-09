@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sdtq_telagailmu_yogyakarta/app/models/pegawai_simple_model.dart';
+import '../../../widgets/number_input_formatter.dart';
 import '../controllers/create_edit_ekskul_controller.dart';
 
 class CreateEditEkskulView extends GetView<CreateEditEkskulController> {
@@ -17,7 +18,7 @@ class CreateEditEkskulView extends GetView<CreateEditEkskulController> {
             onPressed: controller.isSaving.value ? null : controller.saveEkskul,
             child: controller.isSaving.value
               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white))
-              : const Text("SIMPAN", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              : const Text("SIMPAN", style: TextStyle(color: Colors.indigo, fontWeight: FontWeight.bold)),
           )),
         ],
       ),
@@ -38,7 +39,11 @@ class CreateEditEkskulView extends GetView<CreateEditEkskulController> {
               const SizedBox(height: 16),
               TextFormField(controller: controller.jadwalC, decoration: const InputDecoration(labelText: "Jadwal (Teks)", hintText: "Contoh: Setiap Sabtu, 08:00 - 10:00")),
               const SizedBox(height: 16),
-              TextFormField(controller: controller.biayaC, decoration: const InputDecoration(labelText: "Biaya Bulanan (jika ada)", prefixText: "Rp "), keyboardType: TextInputType.number),
+              TextFormField(controller: controller.biayaC, 
+              decoration: const InputDecoration(labelText: "Biaya Bulanan (jika ada)", prefixText: "Rp "), 
+              keyboardType: TextInputType.number,
+              inputFormatters: [NumberInputFormatter()],
+              ),
               const Divider(height: 32),
               
               // --- [DIROMBAK TOTAL] Bagian Pembina Fleksibel ---

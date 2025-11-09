@@ -1,28 +1,31 @@
 // lib/app/modules/create_edit_halaqah_group/views/create_edit_halaqah_group_view.dart
 
+import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../models/pegawai_simple_model.dart';
+import '../../../models/siswa_simple_model.dart';
 import '../controllers/create_edit_halaqah_group_controller.dart';
 
 class CreateEditHalaqahGroupView extends GetView<CreateEditHalaqahGroupController> {
   const CreateEditHalaqahGroupView({Key? key}) : super(key: key);
-  
+
   @override
   Widget build(BuildContext context) {
+    // [FIX] Mengembalikan DefaultTabController sebagai parent dari Scaffold
     return DefaultTabController(
-      length: 2,
+      length: 2, // Jumlah tab kita
       child: Scaffold(
         appBar: AppBar(
           title: Text(controller.isEditMode.value ? 'Edit Grup Halaqah' : 'Buat Grup Halaqah'),
           actions: [
             Obx(() => TextButton(
-              onPressed: controller.isSaving.value ? null : controller.saveGroup,
-              child: controller.isSaving.value 
-                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white))
-                : const Text("SIMPAN", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-            )),
+                  onPressed: controller.isSaving.value ? null : controller.saveGroup,
+                  child: controller.isSaving.value
+                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white))
+                      : const Text("SIMPAN", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                )),
           ],
         ),
         body: Obx(() {
@@ -31,10 +34,18 @@ class CreateEditHalaqahGroupView extends GetView<CreateEditHalaqahGroupControlle
           }
           return Column(
             children: [
+              // Bagian form diletakkan di atas tab
               _buildFormSection(),
+              
+              // TabBar harus berada di dalam Column, di atas TabBarView
               const TabBar(
-                tabs: [Tab(text: "Anggota Grup"), Tab(text: "Siswa Tersedia")],
+                tabs: [
+                  Tab(text: "Anggota Grup"),
+                  Tab(text: "Siswa Tersedia"),
+                ],
               ),
+              
+              // Expanded memastikan TabBarView mengisi sisa ruang
               Expanded(
                 child: TabBarView(
                   children: [
@@ -50,31 +61,40 @@ class CreateEditHalaqahGroupView extends GetView<CreateEditHalaqahGroupControlle
     );
   }
 
+  // [FIX] Menggunakan kode yang sudah benar dari diskusi terakhir kita
   Widget _buildFormSection() {
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          Obx(() => DropdownButtonFormField<PegawaiSimpleModel>( // <-- [FIX] Tambahkan tipe generik
-            value: controller.selectedPengampu.value,
-            // [FIX] isExpanded membuat dropdown menggunakan lebar penuh
-            isExpanded: true, 
-            items: controller.daftarPengampu.map((p) {
-              return DropdownMenuItem<PegawaiSimpleModel>( // <-- [FIX] Tambahkan tipe generik
-                value: p,
-                child: Text(
-                  "${p.nama} (${p.alias})",
-                  overflow: TextOverflow.ellipsis, // Cegah teks terlalu panjang
+          Obx(() => DropdownSearch<PegawaiSimpleModel>(
+                items: (f, cs) => controller.daftarPengampu.toList(),
+                decoratorProps: const DropDownDecoratorProps(
+                  decoration: InputDecoration(
+                    labelText: "Pilih Pengampu",
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-              );
-            }).toList(),
-            onChanged: (value) => controller.selectedPengampu.value = value,
-            decoration: const InputDecoration(labelText: "Pilih Pengampu", border: OutlineInputBorder()),
-          )),
+                popupProps: const PopupProps.menu(
+                  showSearchBox: true,
+                  searchFieldProps: TextFieldProps(
+                    decoration: InputDecoration(hintText: "Cari nama pengampu..."),
+                  ),
+                ),
+                itemAsString: (PegawaiSimpleModel p) => "${p.nama} (${p.alias})",
+                compareFn: (item1, item2) => item1.uid == item2.uid,
+                selectedItem: controller.selectedPengampu.value,
+                onChanged: (value) {
+                  controller.selectedPengampu.value = value;
+                },
+              )),
           const SizedBox(height: 12),
           TextField(
             controller: controller.namaGrupC,
-            decoration: const InputDecoration(labelText: "Nama Grup Halaqah", border: OutlineInputBorder()),
+            decoration: const InputDecoration(
+              labelText: "Nama Grup Halaqah",
+              border: OutlineInputBorder(),
+            ),
           ),
         ],
       ),
@@ -111,18 +131,32 @@ class CreateEditHalaqahGroupView extends GetView<CreateEditHalaqahGroupControlle
           child: SizedBox(
             height: 40,
             child: Obx(() => ListView(
-              scrollDirection: Axis.horizontal,
-              children: controller.daftarKelas.map((kelasId) => Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                child: ChoiceChip(
-                  label: Text(kelasId),
-                  selected: controller.selectedKelasFilter.value == kelasId,
-                  onSelected: (selected) {
-                    if (selected) controller.fetchAvailableStudentsByClass(kelasId);
-                  },
-                ),
-              )).toList(),
-            )),
+                  scrollDirection: Axis.horizontal,
+                  children: controller.daftarKelas
+                      .map((kelasId) => Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                            child: ChoiceChip(
+                              label: Text(kelasId),
+                              selected: controller.selectedKelasFilter.value == kelasId,
+                              onSelected: (selected) {
+                                if (selected) controller.fetchAvailableStudentsByClass(kelasId);
+                              },
+                            ),
+                          ))
+                      .toList(),
+                )),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: TextField(
+            controller: controller.searchC,
+            decoration: InputDecoration(
+              hintText: "Cari nama siswa...",
+              prefixIcon: const Icon(Icons.search),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+            ),
           ),
         ),
         const Divider(height: 1),
@@ -131,13 +165,17 @@ class CreateEditHalaqahGroupView extends GetView<CreateEditHalaqahGroupControlle
             if (controller.selectedKelasFilter.value.isEmpty) {
               return const Center(child: Text("Pilih kelas di atas untuk melihat siswa."));
             }
+            final displayedSiswa = controller.filteredSiswaTersedia;
             if (controller.siswaTersedia.isEmpty) {
               return const Center(child: Text("Tidak ada siswa tersedia di kelas ini."));
             }
+            if (displayedSiswa.isEmpty && controller.searchQuery.value.isNotEmpty) {
+              return Center(child: Text("Siswa dengan nama \"${controller.searchQuery.value}\" tidak ditemukan."));
+            }
             return ListView.builder(
-              itemCount: controller.siswaTersedia.length,
+              itemCount: displayedSiswa.length,
               itemBuilder: (context, index) {
-                final siswa = controller.siswaTersedia[index];
+                final siswa = displayedSiswa[index];
                 return ListTile(
                   title: Text(siswa.nama),
                   trailing: IconButton(

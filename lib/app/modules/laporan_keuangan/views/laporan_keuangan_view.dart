@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import '../../../models/rekap_jenis_tagihan_model.dart';
 import '../../../models/tagihan_model.dart';
+import '../../../routes/app_pages.dart';
 import '../controllers/laporan_keuangan_controller.dart';
 
 class LaporanKeuanganView extends GetView<LaporanKeuanganController> {
@@ -13,6 +14,13 @@ class LaporanKeuanganView extends GetView<LaporanKeuanganController> {
       appBar: AppBar(
         title: const Text('Laporan Keuangan'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.change_circle_outlined),
+            onPressed: () => Get.toNamed(Routes.LAPORAN_PERUBAHAN_UP),
+            tooltip: "Perubahan Uang Pangkal",
+          ),
+        ],
         bottom: TabBar(
           controller: controller.tabController,
           tabs: const [
@@ -225,7 +233,18 @@ class LaporanKeuanganView extends GetView<LaporanKeuanganController> {
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
-                  title: Text(tagihan.id.split('-').last), // Asumsi nama siswa ada di ID
+                  // title: Text(tagihan.id.split('-').last), // Asumsi nama siswa ada di ID
+                  title: Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(tagihan.namaSiswa != null ? tagihan.namaSiswa!.split('-').last : ''),
+                        Text("Kelas: ${tagihan.kelasSaatDitagih?.split('-').first ?? 'N/A'}", style: const TextStyle(fontSize: 12, color: Colors.indigo)),
+                      ],
+                    ),
+                  ), // Asumsi nama siswa ada di ID
                   subtitle: Text("Sisa: Rp ${NumberFormat.decimalPattern('id_ID').format(tagihan.sisaTagihan)}"),
                   trailing: Text(tagihan.status, style: TextStyle(color: Colors.red)),
                 ),

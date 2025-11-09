@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sdtq_telagailmu_yogyakarta/app/models/halaqah_group_model.dart';
 
+import '../../../routes/app_pages.dart';
 import '../controllers/halaqah_dashboard_pengampu_controller.dart';
 
 class HalaqahDashboardPengampuView extends GetView<HalaqahDashboardPengampuController> {
@@ -14,6 +15,11 @@ class HalaqahDashboardPengampuView extends GetView<HalaqahDashboardPengampuContr
       appBar: AppBar(
         title: const Text('Dashboard Halaqah Saya'),
         centerTitle: true,
+      actions: [
+          if (controller.dashC.canManageHalaqah)
+          IconButton(onPressed: () => Get.toNamed(Routes.HALAQAH_MANAGEMENT), 
+          icon: const Icon(Icons.group_add_outlined)), 
+        ],
       ),
       body: FutureBuilder<List<HalaqahGroupModel>>(
         future: controller.listGroupFuture,

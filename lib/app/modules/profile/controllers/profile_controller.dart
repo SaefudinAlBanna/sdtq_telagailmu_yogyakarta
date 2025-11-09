@@ -6,6 +6,8 @@ import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:image_cropper/image_cropper.dart';
+
 import '../../../controllers/auth_controller.dart';
 import '../../../controllers/config_controller.dart';
 import '../../../controllers/storage_controller.dart';
@@ -15,14 +17,6 @@ class ProfileController extends GetxController {
   final ConfigController configC = Get.find<ConfigController>();
   final StorageController storageC = Get.find<StorageController>();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  // --- TEXT EDITING CONTROLLERS ---
-  // late TextEditingController namaController;
-  // late TextEditingController aliasController;
-  // late TextEditingController noTelpController;
-  // late TextEditingController nipController;
-  // late TextEditingController alamatController;
-  // late TextEditingController tglGabungController;
 
   TextEditingController namaController = TextEditingController();
   TextEditingController aliasController = TextEditingController();
@@ -129,13 +123,26 @@ class ProfileController extends GetxController {
   }
 
   /// Memilih gambar dari galeri pengguna.
-  Future<void> pickImage() async {
+  Future<void> pickAndCropImage() async {
     try {
+      // 1. Ambil gambar dari galeri
       final picker = ImagePicker();
       final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-      if (image != null) {
-        pickedImage.value = File(image.path);
-      }
+      if (image == null) return; // Pengguna membatalkan
+
+      // 2. Pangkas (Crop) gambar menjadi persegi
+      CroppedFile? croppedFile = await ImageCropper().cropImage(
+        sourcePath: image.path,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1), // Rasio 1:1 untuk foto profil
+        uiSettings: [
+          AndroidUiSettings(toolbarTitle: 'Pangkas Foto', lockAspectRatio: true),
+          IOSUiSettings(title: 'Pangkas Foto', aspectRatioLockEnabled: true),
+        ],
+      );
+      if (croppedFile == null) return; // Pengguna membatalkan crop
+
+      // 3. Set gambar yang sudah dipangkas untuk pratinjau
+      pickedImage.value = File(croppedFile.path);
     } catch (e) {
       Get.snackbar("Error", "Gagal memilih gambar: $e", backgroundColor: Colors.red, colorText: Colors.white);
     }
@@ -143,35 +150,67 @@ class ProfileController extends GetxController {
 
   /// Mengompres gambar jika ukurannya melebihi batas (200 KB).
   Future<File?> _compressImage(File file) async {
-    final int maxSizeInBytes = 200 * 1024; // 200 KB
-    if (file.lengthSync() <= maxSizeInBytes) {
-      return file; // Tidak perlu kompresi
+    const int targetSizeInBytes = 100 * 1024; // Target 100 KB
+    final int initialSize = file.lengthSync();
+  
+    // Jika sudah di bawah target, tidak perlu kompresi
+    if (initialSize <= targetSizeInBytes) {
+      print("### Gambar tidak perlu dikompresi. Ukuran: ${(initialSize / 1024).toStringAsFixed(2)} KB");
+      return file;
     }
-
+  
     try {
       final tempDir = await getTemporaryDirectory();
-      final path = tempDir.path;
-      final String targetPath = '$path/compressed_${DateTime.now().millisecondsSinceEpoch}.jpg';
-
+      final String targetPath = '${tempDir.path}/compressed_profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
+  
+      // 1. Baca gambar
       img.Image? image = img.decodeImage(file.readAsBytesSync());
       if (image == null) return null;
-
-      // Kompres dengan kualitas 85% sebagai awal
-      List<int> compressedBytes = img.encodeJpg(image, quality: 85);
-
-      // Jika masih terlalu besar, kurangi kualitas secara bertahap
-      int quality = 85;
-      while (compressedBytes.length > maxSizeInBytes && quality > 10) {
-        quality -= 5;
-        compressedBytes = img.encodeJpg(image, quality: quality);
+  
+      // 2. Logika Penskalaan (Resize) Cerdas
+      // Jika gambar sangat besar (misal > 1200px), kecilkan dulu.
+      // Ini adalah langkah paling efektif untuk mengurangi ukuran file.
+      const int maxDimension = 1200;
+      if (image.width > maxDimension || image.height > maxDimension) {
+        if (image.width > image.height) {
+          image = img.copyResize(image, width: maxDimension);
+        } else {
+          image = img.copyResize(image, height: maxDimension);
+        }
+        print("### Gambar di-resize ke ${image.width}x${image.height} px");
       }
-
+  
+      // 3. Logika Kompresi Kualitas (Quality) Adaptif
+      List<int> compressedBytes;
+      int quality = 90; // Mulai dengan kualitas tinggi
+  
+      // Loop untuk menurunkan kualitas hingga ukuran file sesuai target
+      do {
+        compressedBytes = img.encodeJpg(image, quality: quality);
+        print("### Kompresi dengan kualitas $quality. Ukuran baru: ${(compressedBytes.length / 1024).toStringAsFixed(2)} KB");
+        
+        // Turunkan kualitas untuk iterasi berikutnya jika masih terlalu besar
+        if (compressedBytes.length > targetSizeInBytes) {
+          if (quality > 40) {
+            quality -= 10; // Turunkan 10 poin jika kualitas masih bagus
+          } else {
+            quality -= 5;  // Turunkan 5 poin jika kualitas sudah rendah
+          }
+        }
+        
+      } while (compressedBytes.length > targetSizeInBytes && quality > 15); // Berhenti di kualitas 15
+  
+      // 4. Simpan hasil kompresi ke file baru
       File compressedFile = await File(targetPath).writeAsBytes(compressedBytes);
+      final finalSize = compressedFile.lengthSync();
+      print("### Kompresi FINAL selesai. Ukuran akhir: ${(finalSize / 1024).toStringAsFixed(2)} KB");
+      
       return compressedFile;
-
+  
     } catch (e) {
-      Get.snackbar("Error Kompresi", "Gagal memproses gambar.", backgroundColor: Colors.orange, colorText: Colors.white);
-      return null;
+      Get.snackbar("Error Kompresi", "Gagal memproses gambar: ${e.toString()}",
+          backgroundColor: Colors.orange, colorText: Colors.white);
+      return null; // Kembalikan null jika ada error
     }
   }
 

@@ -77,6 +77,16 @@ class HalaqahSetoranSiswaController extends GetxController {
   Future<void> saveData() async {
     isSaving.value = true;
     try {
+      // [FIX] Validasi Tahun Ajaran & Semester di awal
+      final tahunAjaran = configC.tahunAjaranAktif.value;
+      final semester = configC.semesterAktif.value;
+      if (tahunAjaran.isEmpty || tahunAjaran.contains("ERROR") || semester.isEmpty || semester == "0") {
+        Get.snackbar("Validasi Gagal", "Data Tahun Ajaran atau Semester tidak valid. Silakan coba muat ulang halaman.", backgroundColor: Colors.red, colorText: Colors.white);
+        isSaving.value = false;
+        return;
+      }
+      
+      // 1. Persiapan Data dari Form
       final tugasData = {
         'sabak': tugasControllers['sabak']!.text.trim(),
         'sabqi': tugasControllers['sabqi']!.text.trim(),
@@ -89,59 +99,84 @@ class HalaqahSetoranSiswaController extends GetxController {
         'manzil': nilaiControllers['manzil']!.text.trim(),
         'tambahan': nilaiControllers['tambahan']!.text.trim(),
       };
-
+  
+      // 2. Validasi Input
       if (!_validateInputs(tugasData, nilaiData)) {
         isSaving.value = false; return;
       }
       
+      // 3. Inisialisasi Batch dan Referensi Dokumen
       final WriteBatch batch = _firestore.batch();
+      final siswaRef = _firestore.collection('Sekolah').doc(configC.idSekolah).collection('siswa').doc(siswa.uid);
       final penilaiId = authC.auth.currentUser!.uid;
       final penilaiNama = configC.infoUser['nama'];
-      final grupId = Get.find<HalaqahGradingController>().group.id; // Ambil ID Grup
+      final grupId = Get.find<HalaqahGradingController>().group.id;
       
+      // 4. Logika Berdasarkan Mode Halaman
       if (pageMode.value == PageMode.BeriTugas) {
-        final newDocRef = _firestore.collection('Sekolah').doc(configC.idSekolah).collection('siswa').doc(siswa.uid).collection('halaqah_nilai').doc();
-        batch.set(newDocRef, {
-          'tanggalTugas': FieldValue.serverTimestamp(),
-          'status': 'Tugas Diberikan',
-          'tugas': tugasData,
-          'nilai': {},
-          'catatanPengampu': '', 'catatanOrangTua': '',
-          'idPengampu': pengampuUtama['id'],
-          'namaPengampu': pengampuUtama['nama'],
-          'tahunAjaran': configC.tahunAjaranAktif.value,
-          'semester': configC.semesterAktif.value,
-          'idGrup': grupId, // <-- PENTING: Menyimpan ID grup
-        });
+      final newDocRef = _firestore.collection('Sekolah').doc(configC.idSekolah).collection('siswa').doc(siswa.uid).collection('halaqah_nilai').doc();
+      batch.set(newDocRef, {
+        'tanggalTugas': FieldValue.serverTimestamp(),
+        'status': 'Tugas Diberikan',
+        'tugas': tugasData,
+        'nilai': {},
+        'catatanPengampu': '', 'catatanOrangTua': '',
+        'idPengampu': pengampuUtama['id'],
+        'namaPengampu': pengampuUtama['nama'],
+        'tahunAjaran': tahunAjaran, // Gunakan variabel yang sudah divalidasi
+        'semester': semester,       // Gunakan variabel yang sudah divalidasi
+        'idGrup': grupId,
+      });
         
         final notifIsi = _buildNotificationMessage(tugasData, "Tugas baru");
         _addNotificationToBatch(batch, siswa.uid, "Tugas Halaqah Baru", notifIsi);
-      } else {
+  
+      } else { // Mode BeriNilai
         if (docIdToUpdate == null) throw Exception("ID Dokumen untuk update tidak ditemukan!");
-        final docRef = _firestore.collection('Sekolah').doc(configC.idSekolah).collection('siswa').doc(siswa.uid).collection('halaqah_nilai').doc(docIdToUpdate);
+        final docRef = siswaRef.collection('halaqah_nilai').doc(docIdToUpdate);
+        
+        // 4a. Update dokumen setoran di sub-koleksi
         batch.update(docRef, {
           'tanggalDinilai': FieldValue.serverTimestamp(),
           'status': 'Sudah Dinilai',
           'nilai': nilaiData,
           'catatanPengampu': catatanPengampuC.text.trim(),
-          'tugas': tugasData,
+          'tugas': tugasData, // Update tugas jika ada perubahan
           'idPenilai': penilaiId,
           'namaPenilai': penilaiNama,
           'isDinilaiPengganti': isPengganti,
         });
         
+        // 4b. --- [UPGRADE DENORMALISASI DI SINI] ---
+        final setoranTerakhirInfo = {
+          'tugas': tugasData,     // Simpan seluruh Map tugas
+          'nilai': nilaiData,     // Simpan seluruh Map nilai
+          'tanggal': FieldValue.serverTimestamp(),
+        };
+        
+        // Update field 'setoranTerakhirHalaqah' di dokumen utama siswa
+        batch.update(siswaRef, {
+          'setoranTerakhirHalaqah': setoranTerakhirInfo,
+        });
+        // --------------------------------------------
+        
         final notifIsi = _buildNotificationMessage(nilaiData, "Nilai baru");
         _addNotificationToBatch(batch, siswa.uid, "Nilai Halaqah", notifIsi);
       }
       
+      // 5. Commit semua operasi
       await batch.commit();
       
       Get.defaultDialog(
         title: "Berhasil!", middleText: "Penilaian untuk ${siswa.nama} telah berhasil disimpan.",
         textConfirm: "OK", onConfirm: () { Get.back(); Get.back(); },
       );
-    } catch (e) { Get.snackbar("Error", "Gagal menyimpan: ${e.toString()}"); } 
-    finally { isSaving.value = false; }
+  
+    } catch (e) { 
+      Get.snackbar("Error", "Gagal menyimpan: ${e.toString()}"); 
+    } finally { 
+      isSaving.value = false; 
+    }
   }
 
   bool _validateInputs(Map<String, String> tugasData, Map<String, String> nilaiData) {

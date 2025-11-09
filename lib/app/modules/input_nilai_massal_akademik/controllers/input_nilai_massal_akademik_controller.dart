@@ -3,10 +3,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:sdtq_telagailmu_yogyakarta/app/controllers/auth_controller.dart';
-import 'package:sdtq_telagailmu_yogyakarta/app/controllers/config_controller.dart';
-import 'package:sdtq_telagailmu_yogyakarta/app/models/siswa_model.dart';
 
+import '../../../controllers/auth_controller.dart';
+import '../../../controllers/config_controller.dart';
+import '../../../models/siswa_model.dart';
 import '../../manajemen_tugas/controllers/manajemen_tugas_controller.dart';
 
 class InputNilaiMassalAkademikController extends GetxController {
@@ -78,8 +78,10 @@ class InputNilaiMassalAkademikController extends GetxController {
       if (tahunAjaran.isEmpty || tahunAjaran.contains("TIDAK")) {
         throw Exception("Tahun ajaran tidak aktif.");
       }
-
-      // 1. Ambil daftar siswa dari kelas
+  
+      // --- MULAI REVISI ---
+      // 1. Ambil daftar siswa dari kelas (HANYA SATU QUERY)
+      // Query ini sekarang mengambil data yang sudah diperkaya dari subkoleksi daftarsiswa
       final siswaSnap = await _firestore
           .collection('Sekolah').doc(configC.idSekolah)
           .collection('tahunajaran').doc(tahunAjaran)
@@ -88,35 +90,33 @@ class InputNilaiMassalAkademikController extends GetxController {
           .orderBy('namaLengkap')
           .get();
       
-      final List<String> siswaUIDs = siswaSnap.docs.map((doc) => doc.id).toList();
+      // Langsung ubah hasilnya menjadi model, tidak perlu query kedua.
+      final allSiswa = siswaSnap.docs.map((doc) => 
+          SiswaModel.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>))
+          .toList();
+      // --- SELESAI REVISI ---
       
-      if (siswaUIDs.isEmpty) {
-        daftarSiswa.clear();
-        filteredSiswa.clear();
+      daftarSiswa.assignAll(allSiswa);
+      filteredSiswa.assignAll(allSiswa);
+  
+      // Jika tidak ada siswa, hentikan proses lebih awal.
+      if (daftarSiswa.isEmpty) {
         isLoading.value = false;
         return;
       }
-        
-      final siswaDetailSnap = await _firestore
-          .collection('Sekolah').doc(configC.idSekolah)
-          .collection('siswa').where(FieldPath.documentId, whereIn: siswaUIDs).get();
-      
-      final allSiswa = siswaDetailSnap.docs.map((doc) => SiswaModel.fromFirestore(doc)).toList();
-      allSiswa.sort((a, b) => a.namaLengkap.compareTo(b.namaLengkap));
-
-      daftarSiswa.assignAll(allSiswa);
-      filteredSiswa.assignAll(allSiswa);
-
+  
       // 2. Siapkan text controller untuk setiap siswa
       for (var siswa in daftarSiswa) {
         textControllers[siswa.uid] = TextEditingController();
       }
-
+  
       // 3. Jika ini adalah penilaian untuk tugas spesifik, ambil nilai terakhir
       if (idTugasUlangan != null) {
         final Map<String, int> nilaiTerakhirSiswa = {};
-
+  
         // Query untuk setiap siswa untuk mendapatkan nilai terakhirnya untuk tugas ini
+        // NOTE: Loop ini melakukan banyak pembacaan, tapi tidak ada cara yang lebih efisien
+        // untuk 'JOIN' di Firestore. Ini adalah perilaku yang bisa diterima.
         for (final siswa in daftarSiswa) {
           final nilaiSnap = await _firestore
               .collection('Sekolah').doc(configC.idSekolah)
@@ -135,7 +135,7 @@ class InputNilaiMassalAkademikController extends GetxController {
             nilaiTerakhirSiswa[siswa.uid] = nilaiSnap.docs.first.data()['nilai'] as int;
           }
         }
-
+  
         // 4. Isi text controller dengan nilai yang sudah ada
         for (var siswa in daftarSiswa) {
           if (nilaiTerakhirSiswa.containsKey(siswa.uid)) {
@@ -143,9 +143,10 @@ class InputNilaiMassalAkademikController extends GetxController {
           }
         }
       }
-
+  
     } catch (e) {
       Get.snackbar("Error", "Gagal memuat data siswa: ${e.toString()}");
+      print("### ERROR FETCH SISWA MASSAL: $e");
     } finally {
       isLoading.value = false;
     }

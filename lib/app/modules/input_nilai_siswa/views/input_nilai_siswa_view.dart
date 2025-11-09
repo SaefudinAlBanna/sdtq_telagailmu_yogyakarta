@@ -179,7 +179,7 @@ class InputNilaiSiswaView extends GetView<InputNilaiSiswaController> {
               child: Column(
                 children: controller.rekapNilaiMapelLain.map((rekap) => ListTile(
                   title: Text(rekap['mapel']),
-                  subtitle: Text("Guru: ${rekap['guru']}"),
+                  subtitle: Text("Guru: ${rekap['alias'] ?? rekap['guru']}"),
                   trailing: Text(
                     (rekap['nilai_akhir'] as double).toStringAsFixed(1),
                     style: Get.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),

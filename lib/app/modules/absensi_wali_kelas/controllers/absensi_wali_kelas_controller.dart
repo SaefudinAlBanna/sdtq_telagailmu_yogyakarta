@@ -92,38 +92,57 @@ class AbsensiWaliKelasController extends GetxController {
       
       int hadir = 0, sakit = 0, izin = 0, alfa = 0;
       
-      // 1. Simpan absensi untuk setiap siswa secara individual
+      // [BARU] Siapkan map untuk menyimpan detail siswa yang tidak hadir
+      final Map<String, dynamic> detailSiswaTidakHadir = {};
+
+      // 1. Proses data absensi untuk setiap siswa
       for (var siswa in daftarSiswa) {
+        // Simpan absensi individual (path ini sudah benar)
         final ref = _getAbsensiSiswaRef(siswa.uid);
         batch.set(ref, {
           'status': siswa.status.value,
           'tanggal': selectedDate.value,
           'idWaliKelas': configC.infoUser['uid'],
-          'namaWaliKelas': configC.infoUser['alias']
+          'namaWaliKelas': configC.infoUser['alias'] ?? configC.infoUser['nama']
         });
         
-        // Hitung rekap
+        // Hitung rekap numerik dan kumpulkan detail siswa
         switch (siswa.status.value) {
-          case 'Hadir': hadir++; break;
-          case 'Sakit': sakit++; break;
-          case 'Izin': izin++; break;
-          case 'Alfa': alfa++; break;
+          case 'Hadir':
+            hadir++;
+            break;
+          case 'Sakit':
+            sakit++;
+            detailSiswaTidakHadir[siswa.uid] = {'nama': siswa.nama, 'status': 'Sakit'};
+            break;
+          case 'Izin':
+            izin++;
+            detailSiswaTidakHadir[siswa.uid] = {'nama': siswa.nama, 'status': 'Izin'};
+            break;
+          case 'Alfa':
+            alfa++;
+            detailSiswaTidakHadir[siswa.uid] = {'nama': siswa.nama, 'status': 'Alfa'};
+            break;
         }
       }
       
-      // 2. Simpan atau perbarui dokumen rekap harian untuk kelas
+      // 2. Siapkan dokumen rekap harian yang sudah diperkaya
       final rekapRef = _firestore.collection('Sekolah').doc(configC.idSekolah)
           .collection('tahunajaran').doc(configC.tahunAjaranAktif.value)
           .collection('kelastahunajaran').doc(kelasDiampu)
           .collection('semester').doc(configC.semesterAktif.value)
-          .collection('absensi').doc(tanggalTerformat); // Koleksi rekap tetap di sini
+          .collection('absensi').doc(tanggalTerformat);
       
+      // [MODIFIKASI KUNCI] Tambahkan field 'siswa' yang berisi detail siswa tidak hadir
       batch.set(rekapRef, {
         'rekap': {'hadir': hadir, 'sakit': sakit, 'izin': izin, 'alfa': alfa},
+        'siswa': detailSiswaTidakHadir, // <-- DATA PENTING INI DITAMBAHKAN
         'tanggal': selectedDate.value,
+        'namaWaliKelas': configC.infoUser['alias'] ?? configC.infoUser['nama'], // Tambahkan info nama wali kelas
         'lastUpdate': FieldValue.serverTimestamp()
       });
 
+      // 3. Commit semua operasi
       await batch.commit();
       Get.snackbar("Berhasil", "Absensi untuk tanggal ${DateFormat('dd MMM yyyy').format(selectedDate.value)} telah disimpan.");
     } catch (e) {

@@ -12,6 +12,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 import 'package:share_plus/share_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import 'package:image/image.dart' as img;
 
 class InfoSekolahController extends GetxController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -73,14 +74,65 @@ class InfoSekolahController extends GetxController {
   Future<void> pickImage() async {
     try {
       final ImagePicker picker = ImagePicker();
-      final XFile? pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
-      if (pickedFile != null) imageFile.value = File(pickedFile.path);
+      // Ambil gambar dengan kualitas asli
+      final XFile? pickedFile = await picker.pickImage(source: ImageSource.gallery); 
+      if (pickedFile != null) {
+        imageFile.value = File(pickedFile.path);
+      }
     } catch (e) { Get.snackbar('Error', 'Gagal memilih gambar: $e'); }
   }
 
   void removeImage() {
     imageFile.value = null;
     existingImageUrl.value = ''; // Hapus juga gambar lama
+  }
+
+  Future<File?> _compressImage(File file) async {
+    const int targetSizeInBytes = 100 * 1024; // Target 100 KB
+    final int initialSize = file.lengthSync();
+
+    if (initialSize <= targetSizeInBytes) {
+      print("### Gambar Info Sekolah tidak perlu dikompresi.");
+      return file;
+    }
+
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final String targetPath = '${tempDir.path}/compressed_info_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+      img.Image? image = img.decodeImage(file.readAsBytesSync());
+      if (image == null) return null;
+
+      // Penskalaan (Resize) Cerdas
+      const int maxDimension = 1280; // Sedikit lebih besar untuk info sekolah
+      if (image.width > maxDimension || image.height > maxDimension) {
+        image = img.copyResize(image, width: image.width > image.height ? maxDimension : null, height: image.height > image.width ? maxDimension : null);
+        print("### Gambar Info di-resize ke ${image.width}x${image.height} px");
+      }
+
+      // Kompresi Kualitas Adaptif
+      List<int> compressedBytes;
+      int quality = 85; 
+
+      do {
+        compressedBytes = img.encodeJpg(image, quality: quality);
+        print("### Kompresi Info dengan kualitas $quality. Ukuran: ${(compressedBytes.length / 1024).toStringAsFixed(2)} KB");
+        
+        if (compressedBytes.length > targetSizeInBytes) {
+          quality -= 10;
+        }
+      } while (compressedBytes.length > targetSizeInBytes && quality > 20);
+
+      File compressedFile = await File(targetPath).writeAsBytes(compressedBytes);
+      final finalSize = compressedFile.lengthSync();
+      print("### Kompresi Info FINAL selesai. Ukuran: ${(finalSize / 1024).toStringAsFixed(2)} KB");
+      
+      return compressedFile;
+
+    } catch (e) {
+      Get.snackbar("Error Kompresi", "Gagal memproses gambar: ${e.toString()}");
+      return null;
+    }
   }
 
   Future<String?> _uploadImage(File file, String docId) async {
@@ -111,8 +163,17 @@ class InfoSekolahController extends GetxController {
       
       String? imageUrl;
       if (imageFile.value != null) {
-        imageUrl = await _uploadImage(imageFile.value!, newDocId);
-        if (imageUrl == null) { isFormLoading.value = false; return; }
+        // Panggil fungsi kompresi sebelum upload
+        File? imageToUpload = await _compressImage(imageFile.value!);
+        
+        if (imageToUpload != null) {
+          imageUrl = await _uploadImage(imageToUpload, newDocId);
+          if (imageUrl == null) { isFormLoading.value = false; return; }
+        } else {
+          // Gagal kompresi, hentikan proses
+          isFormLoading.value = false;
+          return;
+        }
       } else {
         imageUrl = existingImageUrl.value;
       }

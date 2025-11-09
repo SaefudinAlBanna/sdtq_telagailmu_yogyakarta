@@ -25,7 +25,7 @@ class OnboardingSchoolController extends GetxController {
   void _loadSchoolAppOnboardingItems() {
     onboardingItems = [
       OnboardingItemModel(
-        title: "Ahlan wa Sahlan, Ustadz/Ustadzah PKBM SDTQ Telagailmu YOGYAKARTA!",
+        title: "Ahlan wa Sahlan, Ustadz/Ustadzah PKBM STQ Telagailmu YOGYAKARTA!",
         description: "Aplikasi ini dirancang untuk memudahkan ustadz/ustadzah mengelola kegiatan akademik, data siswa, dan komunikasi di sekolah.",
         imagePath: "assets/lotties/1.json",
         isLottie: true,

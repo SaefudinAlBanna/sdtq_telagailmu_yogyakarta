@@ -140,8 +140,14 @@ class ManajemenTunggakanAwalView extends GetView<ManajemenTunggakanAwalControlle
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {
-                      if (value == null || value.isEmpty) return "Wajib diisi";
-                      if (int.tryParse(value) == null) return "Angka tidak valid";
+                      if (value == null || value.isEmpty) {
+                        return "Wajib diisi";
+                      }
+                      // Hapus karakter titik sebelum melakukan validasi
+                      final cleanValue = value.replaceAll('.', '');
+                      if (int.tryParse(cleanValue) == null) {
+                        return "Angka tidak valid";
+                      }
                       return null;
                     },
                   ),

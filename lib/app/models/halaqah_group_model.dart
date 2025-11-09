@@ -27,6 +27,9 @@ class HalaqahGroupModel {
 
   factory HalaqahGroupModel.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
+
+    // print("DEBUG HALAQAH: Membaca grup '${data['namaGrup']}', profileImageUrl: ->${data['profileImageUrl']}<-");
+
     return HalaqahGroupModel(
       id: doc.id,
       namaGrup: data['namaGrup'] ?? 'Tanpa Nama Grup',

@@ -11,7 +11,28 @@ class PemberianKelasSiswaView extends GetView<PemberianKelasSiswaController> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Atur Kelas Siswa'),
+          title: const Text('Atur Kelas Siswa'),
+          // TAMBAHKAN BAGIAN 'actions' INI
+          // actions: [
+          //   IconButton(
+          //     icon: const Icon(Icons.build_circle),
+          //     tooltip: "Jalankan Migrasi Data Siswa (HANYA SEKALI!)",
+          //     onPressed: () {
+          //       Get.defaultDialog(
+          //         title: "Konfirmasi Migrasi",
+          //         middleText: "Aksi ini akan menambal data siswa yang sudah ada. Apakah Anda yakin? (Lakukan hanya sekali)",
+          //         confirm: ElevatedButton(
+          //           onPressed: () {
+          //             Get.back();
+          //             controller.jalankanMigrasiDataSiswa();
+          //           },
+          //           child: const Text("Ya, Jalankan"),
+          //         ),
+          //         cancel: TextButton(onPressed: Get.back, child: const Text("Batal")),
+          //       );
+          //     },
+          //   ),
+          // ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(40),
           child: Obx(() => Container(

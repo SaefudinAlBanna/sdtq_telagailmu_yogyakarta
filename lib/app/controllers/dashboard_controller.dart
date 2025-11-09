@@ -60,7 +60,7 @@ class DashboardController extends GetxController {
     // final String role = user['role'] ?? '';
     final List<String> tugas = List<String>.from(user['tugas'] ?? []);
     // final bool hasRequiredRole = ['Kepala Sekolah', 'TU', 'Tata Usaha', 'Admin'].contains(role);
-    final bool hasRequiredTugas = tugas.any((t) => ['Koordinator Halaqah Ikhwan', 'Koordinator Halaqah Akhwat', 'Koordinator Halaqah', 'Koordinator Kurikulum'].contains(t));
+    final bool hasRequiredTugas = tugas.any((t) => ['Koordinator Halaqah Ikhwan', 'Koordinator Halaqah Akhwat', 'Koordinator Halaqah'].contains(t));
     // return peranSistem == 'superadmin' || hasRequiredRole || hasRequiredTugas;
     return peranSistem == 'superadmin' || hasRequiredTugas;
   }
@@ -74,6 +74,8 @@ class DashboardController extends GetxController {
     final bool hasRequiredTugas = tugas.any((t) => ['Koordinator Halaqah Ikhwan', 'Koordinator Halaqah Akhwat', 'Koordinator Halaqah'].contains(t));
     return isBendaharaOrPimpinan || hasRequiredTugas; 
   }
+
+  bool get isPenguji => configC.isPengujiHalaqah.value;
 
   bool get isPengampuHalaqah {
     final user = configC.infoUser;
@@ -180,7 +182,7 @@ class DashboardController extends GetxController {
     quickAccessMenus.add({'image': 'uang.png', 'title': 'Buku Besar', 'route': Routes.LAPORAN_KEUANGAN_SEKOLAH});
     // quickAccessMenus.add({'image': 'uang.png', 'title': 'Kategori Keuangan', 'route': Routes.MANAJEMEN_KATEGORI_KEUANGAN});
     } else {
-      quickAccessMenus.add({'image': 'kamera_layar.png', 'title': 'Master Ekskul', 'route': Routes.MANAJEMEN_KALENDER_AKADEMIK});
+      quickAccessMenus.add({'image': 'kamera_layar.png', 'title': 'Kalender Akademik', 'route': Routes.MANAJEMEN_KALENDER_AKADEMIK});
     }
     quickAccessMenus.add({'image': 'faq.png', 'title': 'Lainnya', 'onTap': () => _showAllMenusInView(Get.context!)});
 
@@ -192,12 +194,18 @@ class DashboardController extends GetxController {
       additionalMenus.add({'image': 'toga_lcd.png', 'title': 'Pemberian Kelas', 'route': Routes.PEMBERIAN_KELAS_SISWA});
       additionalMenus.add({'image': 'akademik_1.png', 'title': 'Manajemen Buku', 'route': Routes.MANAJEMEN_PENAWARAN_BUKU});
     }
-    if (canManageHalaqah) {
+    if (kepalaSekolah || canManageHalaqah) {
+      additionalMenus.add({'image': 'hp_toga.png', 'title': 'Manajemen Halaqah', 'route': Routes.HALAQAH_MANAGEMENT});
+      additionalMenus.add({'image': 'hp_toga.png', 'title': 'Koodinatir Halaqah', 'route': Routes.HALAQAH_DASHBOARD});
     }
-    if (isPengujiUmmi) {
-      additionalMenus.add({'image': 'papan_list.png', 'title': 'Jadwal Ujian Ummi', 'route': Routes.HALAQAH_UMMI_JADWAL_PENGUJI});
+    // if (isPengujiUmmi) {
+    //   additionalMenus.add({'image': 'papan_list.png', 'title': 'Jadwal Ujian Ummi', 'route': Routes.HALAQAH_UMMI_JADWAL_PENGUJI});
+    // }
+    if (isPenguji) {
+      additionalMenus.add({'image': 'papan_list.png', 'title': 'Ujian Al-Husna', 'route': Routes.JADWAL_UJIAN_PENGUJI});
     }
     additionalMenus.add({'image': 'daftar_list.png', 'title': 'Daftar Pegawai', 'route': Routes.PEGAWAI});
+    additionalMenus.add({'image': 'daftar_tes.png', 'title': 'Daftar siswa', 'route': Routes.DAFTAR_SISWA});
     additionalMenus.add({'image': 'pengumuman.png', 'title': 'Info Sekolah', 'route': Routes.INFO_SEKOLAH});
     // additionalMenus.add({'image': 'kamera_layar.png', 'title': 'Master Ekskul', 'route': Routes.MASTER_EKSKUL_MANAGEMENT});
     if (isBendaharaOrPimpinan) {
@@ -524,7 +532,8 @@ class DashboardController extends GetxController {
   
   // void goToHalaqahManagement() => Get.toNamed(Routes.HALAQAH_MANAGEMENT); --> METODE AL-HUSNA
   void goToHalaqahManagement() => Get.toNamed(Routes.HALAQAH_UMMI_MANAGEMENT); // --> METODE UMMI
-  void goToHalaqahDashboard() => Get.toNamed(Routes.HALAQAH_UMMI_DASHBOARD_PENGAMPU);
+  // void goToHalaqahDashboard() => Get.toNamed(Routes.HALAQAH_UMMI_DASHBOARD_PENGAMPU);
+  void goToHalaqahDashboard() => Get.toNamed(Routes.HALAQAH_DASHBOARD_PENGAMPU);
   
   void goToRekapAbsensiSekolah() {
     Get.toNamed(Routes.REKAP_ABSENSI, arguments: {'scope': 'sekolah'});

@@ -13,7 +13,6 @@ class ModulAjarFormView extends GetView<ModulAjarFormController> {
       appBar: AppBar(
         title: Obx(() => Text(controller.isEditMode.value ? 'Edit Modul Ajar' : 'Buat Modul Ajar')),
         actions: [
-          // --- [PERBAIKAN KUNCI DI SINI] ---
           Obx(() => IconButton(
             icon: controller.isSaving.value 
                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white))
@@ -32,11 +31,17 @@ class ModulAjarFormView extends GetView<ModulAjarFormController> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-           _buildSectionTitle("1. Informasi Umum"),
+            _buildSectionTitle("1. Informasi Umum"),
+            // --- [MODIFIKASI] Dropdown sekarang berbasis ID Mapel ---
             Obx(() => DropdownButtonFormField<String>(
-                  value: controller.mapelTerpilih.value,
+                  value: controller.idMapelTerpilih.value,
                   hint: const Text("Pilih Mata Pelajaran"),
-                  items: controller.daftarMapelUnik.map((mapel) => DropdownMenuItem(value: mapel, child: Text(mapel))).toList(),
+                  items: controller.daftarMapelUnik.map((mapel) {
+                    return DropdownMenuItem(
+                      value: mapel['id'],
+                      child: Text(mapel['nama']!),
+                    );
+                  }).toList(),
                   onChanged: controller.onMapelChanged,
                   decoration: const InputDecoration(labelText: 'Mata Pelajaran', border: OutlineInputBorder()),
                 )),
@@ -47,17 +52,17 @@ class ModulAjarFormView extends GetView<ModulAjarFormController> {
                       value: controller.kelasTerpilih.value,
                       hint: const Text("Pilih Kelas"),
                       items: controller.daftarKelasTersedia.map((kelas) => DropdownMenuItem(value: kelas, child: Text("Kelas $kelas"))).toList(),
-                      onChanged: controller.mapelTerpilih.value == null ? null : controller.onKelasChanged,
+                      onChanged: controller.idMapelTerpilih.value == null ? null : controller.onKelasChanged,
                       decoration: InputDecoration(
                         labelText: 'Kelas',
                         border: const OutlineInputBorder(),
-                        filled: controller.mapelTerpilih.value == null,
+                        filled: controller.idMapelTerpilih.value == null,
                         fillColor: Colors.grey.shade200,
                       ),
                     ))),
                 const SizedBox(width: 12),
                 Expanded(child: Obx(() => TextFormField(
-                      key: Key(controller.faseTerpilih.value), // Kunci untuk rebuild
+                      key: Key(controller.faseTerpilih.value),
                       initialValue: controller.faseTerpilih.value,
                       readOnly: true,
                       decoration: InputDecoration(
@@ -67,9 +72,8 @@ class ModulAjarFormView extends GetView<ModulAjarFormController> {
                     ))),
               ],
             ),
-            const SizedBox(height: 12), // Menambah jarak sebelum field Alokasi Waktu
+            const SizedBox(height: 12),
             _buildTextField(controller.alokasiWaktuC, "Alokasi Waktu (Contoh: 2 JP)"),
-            
             _buildSectionTitle("2. Kompetensi & Target"),
             _buildTextField(controller.kompetensiAwalC, "Kompetensi Awal", maxLines: 3),
             

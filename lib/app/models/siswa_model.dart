@@ -137,7 +137,60 @@ class SiswaModel {
       createdAt: toDateTime(data['createdAt']),
       createdBy: data['createdBy'], 
       memilikiCatatanBk: data['memilikiCatatanBk'] ?? false, 
-      
+    );
+  }
+
+  // --- [METODE BARU DITAMBAHKAN] ---
+  /// Membuat salinan objek SiswaModel dengan beberapa nilai yang diperbarui.
+  /// Ini sangat berguna untuk memperbarui state UI secara reaktif.
+  SiswaModel copyWith({
+    String? kelasId,
+    String? statusSiswa,
+    bool removeKelasId = false, // Parameter khusus untuk mengubah kelasId menjadi null
+  }) {
+    return SiswaModel(
+      // Salin semua properti yang ada dari objek saat ini ('this')
+      uid: this.uid,
+      nisn: this.nisn,
+      namaLengkap: this.namaLengkap,
+      memilikiCatatanBk: this.memilikiCatatanBk,
+      namaPanggilan: this.namaPanggilan,
+      email: this.email,
+      fotoProfilUrl: this.fotoProfilUrl,
+      jenisKelamin: this.jenisKelamin,
+      tempatLahir: this.tempatLahir,
+      tanggalLahir: this.tanggalLahir,
+      agama: this.agama,
+      kewarganegaraan: this.kewarganegaraan,
+      anakKe: this.anakKe,
+      jumlahSaudara: this.jumlahSaudara,
+      tahunMasuk: this.tahunMasuk,
+      spp: this.spp,
+      namaAyah: this.namaAyah,
+      pekerjaanAyah: this.pekerjaanAyah,
+      pendidikanAyah: this.pendidikanAyah,
+      noHpAyah: this.noHpAyah,
+      namaIbu: this.namaIbu,
+      pekerjaanIbu: this.pekerjaanIbu,
+      pendidikanIbu: this.pendidikanIbu,
+      noHpIbu: this.noHpIbu,
+      namaWali: this.namaWali,
+      hubunganWali: this.hubunganWali,
+      pekerjaanWali: this.pekerjaanWali,
+      noHpWali: this.noHpWali,
+      alamatLengkap: this.alamatLengkap,
+      teleponRumah: this.teleponRumah,
+      isProfileComplete: this.isProfileComplete,
+      mustChangePassword: this.mustChangePassword,
+      createdAt: this.createdAt,
+      createdBy: this.createdBy,
+
+      // Terapkan nilai baru jika ada perubahan
+      // Jika removeKelasId adalah true, paksa kelasId menjadi null.
+      // Jika tidak, gunakan nilai kelasId yang baru jika ada, atau pertahankan yang lama.
+      kelasId: removeKelasId ? null : (kelasId ?? this.kelasId),
+      // Gunakan nilai statusSiswa yang baru jika ada, atau pertahankan yang lama.
+      statusSiswa: statusSiswa ?? this.statusSiswa,
     );
   }
 }

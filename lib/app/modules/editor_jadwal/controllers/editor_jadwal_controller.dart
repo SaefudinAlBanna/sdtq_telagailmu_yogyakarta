@@ -276,43 +276,6 @@ class EditorJadwalController extends GetxController {
       ));
   }
 
-  // void pilihDariTemplate(int index) {
-  //     Get.dialog(AlertDialog(
-  //       title: const Text("Pilih dari Template"),
-  //       content: SizedBox(
-  //         width: double.maxFinite,
-  //         child: ListView.builder(
-  //           shrinkWrap: true,
-  //           itemCount: daftarJamMaster.length,
-  //           itemBuilder: (context, i) {
-  //             final jam = daftarJamMaster[i];
-  //             return ListTile(
-  //               title: Text(jam['namaKegiatan']),
-  //               subtitle: Text("${jam['jamMulai']} - ${jam['jamSelesai']}"),
-  //               onTap: () {
-  //                 final pelajaran = jadwalPelajaran[selectedHari.value]![index];
-  //                 pelajaran['jamMulai'] = jam['jamMulai'];
-  //                 pelajaran['jamSelesai'] = jam['jamSelesai'];
-  //                 pelajaran['jam'] = "${jam['jamMulai']} - ${jam['jamSelesai']}";
-                  
-  //                 // Jika ini kegiatan umum, isi nama mapel & hapus guru
-  //                 if (['Istirahat', 'Upacara', 'Shalat Dhuha'].contains(jam['namaKegiatan'])) {
-  //                     pelajaran['namaMapel'] = jam['namaKegiatan'];
-  //                     pelajaran['idMapel'] = null;
-  //                     pelajaran['idGuru'] = null;
-  //                     pelajaran['namaGuru'] = null;
-  //                 }
-  //                 jadwalPelajaran[selectedHari.value]!.refresh();
-  //                 Get.back();
-  //               },
-  //             );
-  //           },
-  //         ),
-  //       ),
-  //     ));
-  // }
-
-  // ... (fungsi _clearJadwal, hapusPelajaran, dan simpanJadwal tidak banyak berubah)
   void _clearJadwal() { 
     for (var hari in daftarHari) {
        jadwalPelajaran[hari]?.clear(); 
@@ -391,6 +354,7 @@ class EditorJadwalController extends GetxController {
     final otherSchedulesSnapshot = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('tahunajaran').doc(tahunAjaranAktif).collection('jadwalkelas').where(FieldPath.documentId, isNotEqualTo: selectedKelasId.value!).get();
     final Map<String, String> guruBookings = {};
 
+    // Langkah 1: Bangun peta jadwal guru dari kelas-kelas LAIN.
     for (var doc in otherSchedulesSnapshot.docs) {
       final idKelasLain = doc.id;
       doc.data().forEach((hari, listPelajaran) {
@@ -398,7 +362,11 @@ class EditorJadwalController extends GetxController {
           for (var pelajaran in listPelajaran) {
             final jam = pelajaran['jam'] as String?;
             final idGuru = pelajaran['idGuru'] as String?;
-            if (jam != null && idGuru != null) {
+            final idMapel = pelajaran['idMapel'] as String?; // Ambil idMapel
+
+            // [PERBAIKAN LOGIKA]
+            // Jangan masukkan jadwal Tahsin/Tahfidz dari kelas lain ke dalam peta bentrok.
+            if (jam != null && idGuru != null && idMapel != 'halaqah') {
               guruBookings['$idGuru-$hari-$jam'] = daftarKelas.firstWhere((k) => k['id'] == idKelasLain, orElse: () => {'nama': '?'})['nama'];
             }
           }
@@ -406,264 +374,28 @@ class EditorJadwalController extends GetxController {
       });
     }
 
+    // Langkah 2: Periksa jadwal kelas yang SEDANG DIEDIT terhadap peta bentrok.
     for (var hari in jadwalPelajaran.keys) {
       for (var slot in jadwalPelajaran[hari]!) {
         final jam = slot['jam'] as String?;
         final idGuru = slot['idGuru'] as String?;
-        if (jam == null || idGuru == null) continue;
+        final idMapel = slot['idMapel'] as String?; // Ambil idMapel
+
+        // [PERBAIKAN LOGIKA UTAMA DI SINI]
+        // Jika slot ini adalah Tahsin/Tahfidz, atau datanya belum lengkap,
+        // lewati pengecekan bentrok untuk slot ini.
+        if (idMapel == 'halaqah' || jam == null || idGuru == null) {
+          continue; // Lanjut ke slot berikutnya
+        }
 
         final key = '$idGuru-$hari-$jam';
         if (guruBookings.containsKey(key)) {
-          final namaGuru = _guruTugasTersedia.firstWhere((g) => g['uid'] == idGuru, orElse: () => {'nama': '?'})['nama'];
+          final guruData = _semuaGuruTersedia.firstWhere((g) => g['uid'] == idGuru, orElse: () => {'nama': 'Guru tidak dikenal'});
+          final namaGuru = guruData['alias'] ?? guruData['nama'];
           return "Bentrok: $namaGuru sudah terjadwal di Kelas ${guruBookings[key]} pada hari $hari, jam $jam.";
         }
       }
     }
-    return null;
+    return null; // Tidak ada bentrok
   }
 }
-
-
-// // lib/app/modules/editor_jadwal/controllers/editor_jadwal_controller.dart
-
-// import 'dart:async';
-// import 'package:cloud_firestore/cloud_firestore.dart';
-// import 'package:flutter/material.dart';
-// import 'package:get/get.dart';
-// import 'package:mi_alhuda_yogyakarta/app/controllers/config_controller.dart';
-
-// class EditorJadwalController extends GetxController {
-//   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-//   final ConfigController configC = Get.find<ConfigController>();
-//   late Worker _statusWorker;
-
-//   late Worker _tahunAjaranWorker;
-
-//   final isLoading = true.obs;
-//   final isLoadingJadwal = false.obs;
-//   final isSaving = false.obs;
-
-//   final RxList<Map<String, dynamic>> daftarKelas = <Map<String, dynamic>>[].obs;
-//   final RxList<Map<String, dynamic>> daftarJam = <Map<String, dynamic>>[].obs;
-//   final RxList<Map<String, dynamic>> daftarMapelTersedia = <Map<String, dynamic>>[].obs;
-//   final RxList<Map<String, dynamic>> daftarGuruTersedia = <Map<String, dynamic>>[].obs;
-
-//   final Rxn<String> selectedKelasId = Rxn<String>();
-//   final RxString selectedHari = 'Senin'.obs;
-//   final RxMap<String, RxList<Map<String, dynamic>>> jadwalPelajaran = <String, RxList<Map<String, dynamic>>>{}.obs;
-//   final List<String> daftarHari = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
-  
-//   String get tahunAjaranAktif => configC.tahunAjaranAktif.value;
-
-//    @override
-//   void onInit() {
-//     super.onInit();
-//     for (var hari in daftarHari) { jadwalPelajaran[hari] = <Map<String, dynamic>>[].obs; }
-
-//     // Worker ini akan "mengawasi" status di ConfigController.
-//     _statusWorker = ever(configC.status, (appStatus) {
-//       if (appStatus == AppStatus.authenticated && isLoading.value) {
-//         _initializeData();
-//       }
-//     });
-//   }
-
-//   @override
-//   void onReady() {
-//     super.onReady();
-//     if (configC.status.value == AppStatus.authenticated && isLoading.value) {
-//       _initializeData();
-//     }
-//   }
-
-//   @override
-//   void onClose() {
-//     _statusWorker.dispose();
-//     super.onClose();
-//   }
-
-//   Future<void> _initializeData() async {
-//     isLoading.value = true;
-//     await _fetchDaftarKelas();
-//     isLoading.value = false;
-//   }
-
-//   Future<void> _fetchDaftarKelas() async {
-//     if (tahunAjaranAktif.isEmpty || tahunAjaranAktif.contains("TIDAK DITEMUKAN")) {
-//       Get.snackbar("Kesalahan Konfigurasi", "Tahun ajaran aktif tidak ditemukan.");
-//       daftarKelas.clear();
-//       return;
-//     }
-//     final snapshot = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('kelas').where('tahunAjaran', isEqualTo: tahunAjaranAktif).orderBy('namaKelas').get();
-//     daftarKelas.value = snapshot.docs.map((doc) => {'id': doc.id, 'nama': doc.data()['namaKelas'] ?? doc.id}).toList();
-//   }
-
-//   // Sisa controller tidak ada perubahan...
-//   Future<void> onKelasChanged(String? kelasId) async {
-//     if (kelasId == null) return;
-//     selectedKelasId.value = kelasId;
-//     _clearJadwal();
-//     isLoadingJadwal.value = true;
-//     await Future.wait([ _fetchJadwal(), _fetchDaftarJam(), _fetchGuruDanMapel() ]);
-//     isLoadingJadwal.value = false;
-//   }
-  
-//   Future<void> _fetchJadwal() async {
-//     if (selectedKelasId.value == null) return;
-//     try {
-//       final docSnap = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('tahunajaran').doc(tahunAjaranAktif).collection('jadwalkelas').doc(selectedKelasId.value!).get();
-//       _clearJadwal();
-//       if (docSnap.exists && docSnap.data() != null) {
-//         final dataJadwal = docSnap.data() as Map<String, dynamic>;
-//         dataJadwal.forEach((hari, listData) {
-//           if (jadwalPelajaran.containsKey(hari) && listData is List) {
-//             jadwalPelajaran[hari]!.value = List<Map<String, dynamic>>.from(listData);
-//           }
-//         });
-//       }
-//     } catch (e) { Get.snackbar('Error', 'Gagal memuat jadwal: ${e.toString()}'); }
-//   }
-
-//   Future<void> _fetchDaftarJam() async {
-//     final snapshot = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('jampelajaran').orderBy('urutan').get();
-    
-//     // --- [PERBAIKAN] Tambahkan pengecekan null dengan fallback string kosong ---
-//     daftarJam.value = snapshot.docs.map((doc) {
-//       final data = doc.data();
-//       final nama = data['namaKegiatan'] as String? ?? '';
-//       final waktu = data['jampelajaran'] as String? ?? '';
-//       return {
-//         'id': doc.id, 
-//         'label': "$nama ($waktu)", 
-//         'waktu': waktu,
-//       };
-//     }).toList();
-//     // -------------------------------------------------------------------------
-//   }
-
-//   Future<void> _fetchGuruDanMapel() async {
-//     if (selectedKelasId.value == null) return;
-//     try {
-//       final snapshot = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('tahunajaran')
-//                             .doc(tahunAjaranAktif).collection('penugasan').doc(selectedKelasId.value!)
-//                             .collection('matapelajaran').get();
-
-//       daftarMapelTersedia.clear();
-//       daftarGuruTersedia.clear();
-//       final Set<String> uniqueMapelIds = {};
-
-//       for(var doc in snapshot.docs) {
-//         final data = doc.data();
-        
-//         // --- [PERBAIKAN] Ambil data dengan fallback untuk mencegah null ---
-//         final namaGuru = data['namaGuru'] as String? ?? 'Tanpa Nama';
-//         final aliasGuru = data['aliasGuru'] as String?;
-//         final namaMapel = data['namaMapel'] as String? ?? 'Tanpa Nama Mapel';
-//         // -----------------------------------------------------------------
-
-//         daftarGuruTersedia.add({
-//           'uid': data['idGuru'],
-//           'nama': namaGuru, 
-//           'alias': (aliasGuru == null || aliasGuru.isEmpty) ? namaGuru : aliasGuru,
-//           'idMapel': data['idMapel']
-//         });
-
-//         if (uniqueMapelIds.add(data['idMapel'])) {
-//           daftarMapelTersedia.add({'idMapel': data['idMapel'], 'nama': namaMapel});
-//         }
-//       }
-//     } catch(e) { Get.snackbar("Error", "Gagal memuat data guru & mapel: $e"); } 
-//   }
-
-//   void updatePelajaran(int index, String key, dynamic value) {
-//     final pelajaran = jadwalPelajaran[selectedHari.value]![index];
-//     if (key == 'idMapel') {
-//       final mapel = daftarMapelTersedia.firstWhere((m) => m['idMapel'] == value, orElse: () => {});
-//       pelajaran['idMapel'] = value;
-//       pelajaran['namaMapel'] = mapel['nama'];
-//       pelajaran['idGuru'] = null;
-//       pelajaran['namaGuru'] = null;
-//     } else if (key == 'idGuru') {
-//       final guru = daftarGuruTersedia.firstWhere((g) => g['uid'] == value, orElse: () => {});
-//       pelajaran['idGuru'] = value;
-//       // --- [PERBAIKAN] Simpan 'alias' guru ke dalam jadwal ---
-//       pelajaran['namaGuru'] = guru['alias'];
-//       // -------------------------------------------------------
-//     } else {
-//       pelajaran[key] = value;
-//     }
-//     jadwalPelajaran[selectedHari.value]!.refresh();
-//   }
-
-//   void _clearJadwal() { 
-//     for (var hari in daftarHari) { 
-//       jadwalPelajaran[hari]?.clear(); 
-//     } 
-//   }
-  
-//   void tambahPelajaran() {
-//     jadwalPelajaran[selectedHari.value]?.add({
-//       'jam': null, 'idMapel': null, 'namaMapel': null, 'idGuru': null, 'namaGuru': null,
-//     });
-//   }
-
-//   void hapusPelajaran(int index) {
-//     jadwalPelajaran[selectedHari.value]?.removeAt(index);
-//   }
-
-//   Future<void> simpanJadwal() async {
-//     if (selectedKelasId.value == null) return;
-//     isSaving.value = true;
-    
-//     final String? errorMessage = await _validateGuruClash();
-//     if (errorMessage != null) {
-//       Get.snackbar('Jadwal Bentrok!', errorMessage, backgroundColor: Colors.red, colorText: Colors.white, duration: const Duration(seconds: 5));
-//       isSaving.value = false;
-//       return;
-//     }
-
-//     try {
-//       Map<String, List<Map<String, dynamic>>> dataToSave = {};
-//       jadwalPelajaran.forEach((hari, list) { dataToSave[hari] = list.toList(); });
-      
-//       await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('tahunajaran').doc(tahunAjaranAktif).collection('jadwalkelas').doc(selectedKelasId.value!).set(dataToSave);
-//       Get.snackbar('Berhasil', 'Jadwal pelajaran berhasil disimpan.');
-//     } catch (e) { Get.snackbar('Error', 'Gagal menyimpan jadwal: ${e.toString()}'); } 
-//     finally { isSaving.value = false; }
-//   }
-
-//   Future<String?> _validateGuruClash() async {
-//     final otherSchedulesSnapshot = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('tahunajaran').doc(tahunAjaranAktif).collection('jadwalkelas').where(FieldPath.documentId, isNotEqualTo: selectedKelasId.value!).get();
-//     final Map<String, String> guruBookings = {};
-
-//     for (var doc in otherSchedulesSnapshot.docs) {
-//       final idKelasLain = doc.id;
-//       doc.data().forEach((hari, listPelajaran) {
-//         if (listPelajaran is List) {
-//           for (var pelajaran in listPelajaran) {
-//             final jam = pelajaran['jam'] as String?;
-//             final idGuru = pelajaran['idGuru'] as String?;
-//             if (jam != null && idGuru != null) {
-//               guruBookings['$idGuru-$hari-$jam'] = daftarKelas.firstWhere((k) => k['id'] == idKelasLain, orElse: () => {'nama': '?'})['nama'];
-//             }
-//           }
-//         }
-//       });
-//     }
-
-//     for (var hari in jadwalPelajaran.keys) {
-//       for (var slot in jadwalPelajaran[hari]!) {
-//         final jam = slot['jam'] as String?;
-//         final idGuru = slot['idGuru'] as String?;
-//         if (jam == null || idGuru == null) continue;
-
-//         final key = '$idGuru-$hari-$jam';
-//         if (guruBookings.containsKey(key)) {
-//           final namaGuru = daftarGuruTersedia.firstWhere((g) => g['uid'] == idGuru, orElse: () => {'nama': '?'})['nama'];
-//           return "Bentrok: $namaGuru sudah terjadwal di Kelas ${guruBookings[key]} pada hari $hari, jam $jam.";
-//         }
-//       }
-//     }
-//     return null;
-//   }
-// }

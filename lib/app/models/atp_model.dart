@@ -1,11 +1,14 @@
+// lib/app/models/atp_model.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AtpModel {
   String idAtp;
   String idSekolah;
   String idPenyusun;
-   String namaPenyusun;
+  String namaPenyusun;
   final String idTahunAjaran;
+  final String idMapel; 
   final String namaMapel;
   final String fase;
   final int kelas;
@@ -20,6 +23,7 @@ class AtpModel {
     required this.idPenyusun,
     required this.namaPenyusun,
     required this.idTahunAjaran,
+    required this.idMapel, 
     required this.namaMapel,
     required this.fase,
     required this.kelas,
@@ -29,7 +33,6 @@ class AtpModel {
     required this.unitPembelajaran,
   });
 
-  // Konversi dari JSON (Map Firestore) ke Object Dart
   factory AtpModel.fromJson(Map<String, dynamic> json) {
     return AtpModel(
       idAtp: json['idAtp'] ?? '',
@@ -37,6 +40,7 @@ class AtpModel {
       idPenyusun: json['idPenyusun'] ?? '',
       namaPenyusun: json['namaPenyusun'] ?? '',
       idTahunAjaran: json['idTahunAjaran'] ?? '',
+      idMapel: json['idMapel'] ?? '', 
       namaMapel: json['namaMapel'] ?? '',
       fase: json['fase'] ?? '',
       kelas: json['kelas'] ?? 0,
@@ -49,7 +53,6 @@ class AtpModel {
     );
   }
 
-  // Konversi dari Object Dart ke JSON (Map untuk dikirim ke Firestore)
   Map<String, dynamic> toJson() {
     return {
       'idAtp': idAtp,
@@ -57,6 +60,7 @@ class AtpModel {
       'idPenyusun': idPenyusun,
       'namaPenyusun': namaPenyusun,
       'idTahunAjaran': idTahunAjaran,
+      'idMapel': idMapel, 
       'namaMapel': namaMapel,
       'fase': fase,
       'kelas': kelas,
@@ -66,8 +70,8 @@ class AtpModel {
       'unitPembelajaran': unitPembelajaran.map((unit) => unit.toJson()).toList(),
     };
   }
-   
-  // Fungsi untuk duplikasi (ini akan sangat berguna nanti!)
+  
+  // Fungsi copyWith tidak perlu diubah karena sudah menangani field dengan benar
   AtpModel copyWith({String? idAtp, String? idTahunAjaran}) {
     return AtpModel(
       idAtp: idAtp ?? this.idAtp,
@@ -75,17 +79,19 @@ class AtpModel {
       idPenyusun: this.idPenyusun,
       namaPenyusun: this.namaPenyusun,
       idTahunAjaran: idTahunAjaran ?? this.idTahunAjaran,
+      idMapel: this.idMapel, // Pastikan field baru ikut disalin
       namaMapel: this.namaMapel,
       fase: this.fase,
       kelas: this.kelas,
       capaianPembelajaran: this.capaianPembelajaran,
-      createdAt: Timestamp.now(), // Waktu baru saat diduplikasi
-      lastModified: Timestamp.now(), // Waktu baru saat diduplikasi
+      createdAt: Timestamp.now(),
+      lastModified: Timestamp.now(),
       unitPembelajaran: this.unitPembelajaran.map((e) => e.copyWith()).toList(),
     );
   }
 }
 
+// Class UnitPembelajaran dan AlurPembelajaran tidak perlu diubah.
 class UnitPembelajaran {
   final String idUnit;
   final int urutan;
@@ -95,10 +101,8 @@ class UnitPembelajaran {
   final String alokasiWaktu;
   final List<String> tujuanPembelajaran;
   final List<AlurPembelajaran> alurPembelajaran;
-
-  // --- TAMBAHAN BARU ---
-  int? semester; // Semester berapa unit ini diajarkan (1 atau 2)
-  String? bulan;  // Bulan apa unit ini diajarkan (e.g., "Juli", "Agustus")
+  int? semester;
+  String? bulan;
 
   UnitPembelajaran({
     required this.idUnit,
@@ -109,8 +113,6 @@ class UnitPembelajaran {
     required this.alokasiWaktu,
     required this.tujuanPembelajaran,
     required this.alurPembelajaran,
-
-    // Tambahkan di constructor
     this.semester,
     this.bulan,
   });
@@ -127,10 +129,8 @@ class UnitPembelajaran {
       alurPembelajaran: (json['alurPembelajaran'] as List<dynamic>? ?? [])
           .map((alur) => AlurPembelajaran.fromJson(alur))
           .toList(),
-
-          // Ambil data baru dari JSON
-      semester: json['semester'], // Boleh null
-      bulan: json['bulan'],     // Boleh null
+      semester: json['semester'],
+      bulan: json['bulan'],
     );
   }
 
@@ -144,8 +144,6 @@ class UnitPembelajaran {
       'alokasiWaktu': alokasiWaktu,
       'tujuanPembelajaran': tujuanPembelajaran,
       'alurPembelajaran': alurPembelajaran.map((alur) => alur.toJson()).toList(),
-
-       // Tambahkan field baru ke JSON
       'semester': semester,
       'bulan': bulan,
     };

@@ -18,25 +18,26 @@ class AtpFormController extends GetxController {
   final RxBool isEditMode = false.obs;
   AtpModel? originalAtp;
 
-  // --- State Penugasan ---
   final RxBool isPenugasanLoading = true.obs;
-  final List<Map<String, dynamic>> penugasanGuru = []; // Data mentah dari Firestore
+  // --- [MODIFIKASI] penugasanGuru menyimpan semua data, termasuk idMapel ---
+  final List<Map<String, dynamic>> penugasanGuru = [];
 
-  // --- State Form Utama ---
   final TextEditingController capaianPembelajaranC = TextEditingController();
-  final RxList<String> daftarMapelUnik = <String>[].obs; // Hanya nama mapel unik
-  final RxList<String> daftarKelasTersedia = <String>[].obs; // Kelas yang tersedia setelah mapel dipilih
-  final Rxn<String> mapelTerpilih = Rxn<String>();
+  // --- [MODIFIKASI] State untuk menyimpan daftar mapel unik (dengan ID dan Nama) ---
+  final RxList<Map<String, String>> daftarMapelUnik = <Map<String, String>>[].obs;
+  final RxList<String> daftarKelasTersedia = <String>[].obs;
+
+  // --- [MODIFIKASI] State sekarang menyimpan ID Mapel, bukan namanya ---
+  final Rxn<String> idMapelTerpilih = Rxn<String>();
   final Rxn<String> kelasTerpilih = Rxn<String>();
   final RxString faseTerpilih = ''.obs;
 
-  // --- State Unit Pembelajaran Dinamis ---
   final RxList<UnitPembelajaranForm> unitPembelajaranForms = <UnitPembelajaranForm>[].obs;
 
   @override
   void onInit() {
     super.onInit();
-    _loadPenugasanGuru(); // Ganti _loadInitialData dengan ini
+    _loadPenugasanGuru();
     if (Get.arguments != null && Get.arguments is AtpModel) {
       isEditMode.value = true;
       originalAtp = Get.arguments as AtpModel;
@@ -44,8 +45,7 @@ class AtpFormController extends GetxController {
     }
   }
 
-
-    @override
+  @override
   void onClose() {
     capaianPembelajaranC.dispose();
     for (var unitForm in unitPembelajaranForms) {
@@ -65,12 +65,16 @@ class AtpFormController extends GetxController {
 
       penugasanGuru.assignAll(snapshot.docs.map((doc) => doc.data()).toList());
       
-      // Buat daftar mapel unik dari data penugasan
-      final mapelSet = <String>{};
+      // --- [MODIFIKASI] Membuat daftar mapel unik dengan ID dan Nama ---
+      final mapelUnikMap = <String, String>{}; // Key: idMapel, Value: namaMapel
       for (var tugas in penugasanGuru) {
-        mapelSet.add(tugas['namaMapel']);
+        if (tugas['idMapel'] != null && tugas['namaMapel'] != null) {
+          mapelUnikMap[tugas['idMapel']] = tugas['namaMapel'];
+        }
       }
-      daftarMapelUnik.assignAll(mapelSet.toList()..sort());
+      // Konversi map ke list of map untuk dropdown
+      daftarMapelUnik.assignAll(mapelUnikMap.entries.map((e) => {'id': e.key, 'nama': e.value}).toList()
+        ..sort((a, b) => a['nama']!.compareTo(b['nama']!)));
 
     } catch (e) {
       Get.snackbar("Error", "Gagal memuat data penugasan mengajar Anda.");
@@ -80,28 +84,26 @@ class AtpFormController extends GetxController {
   }
 
   void _fillFormWithData(AtpModel atp) {
-    mapelTerpilih.value = atp.namaMapel;
-    // Panggil onMapelChanged untuk mengisi daftar kelas yang relevan
-    onMapelChanged(atp.namaMapel); 
+    // --- [MODIFIKASI] Mengisi form dengan idMapel ---
+    idMapelTerpilih.value = atp.idMapel;
+    onMapelChanged(atp.idMapel); 
     kelasTerpilih.value = atp.kelas.toString();
     faseTerpilih.value = atp.fase;
     capaianPembelajaranC.text = atp.capaianPembelajaran;
     unitPembelajaranForms.value = atp.unitPembelajaran.map((unit) => UnitPembelajaranForm.fromModel(unit)).toList();
   }
 
-  void onMapelChanged(String? newValue) {
-    mapelTerpilih.value = newValue;
-    // Reset pilihan kelas & fase
+  void onMapelChanged(String? newIdMapel) {
+    idMapelTerpilih.value = newIdMapel;
     kelasTerpilih.value = null;
     faseTerpilih.value = '';
     daftarKelasTersedia.clear();
 
-    if (newValue != null) {
-      // Filter penugasan untuk mapel yang dipilih, lalu ambil kelasnya
+    if (newIdMapel != null) {
       final kelasSet = <String>{};
       for (var tugas in penugasanGuru) {
-        if (tugas['namaMapel'] == newValue) {
-          // Ambil hanya angka dari ID kelas (e.g., '4' dari '4A-2024')
+        // --- [MODIFIKASI] Filter berdasarkan idMapel ---
+        if (tugas['idMapel'] == newIdMapel) {
           final kelasAngka = tugas['idKelas'].split('-').first.replaceAll(RegExp(r'[^0-9]'), '');
           if (kelasAngka.isNotEmpty) kelasSet.add(kelasAngka);
         }
@@ -131,7 +133,8 @@ class AtpFormController extends GetxController {
   }
 
   Future<void> saveAtp() async {
-    if (mapelTerpilih.value == null || kelasTerpilih.value == null || capaianPembelajaranC.text.trim().isEmpty) {
+    // --- [MODIFIKASI] Validasi berdasarkan idMapelTerpilih ---
+    if (idMapelTerpilih.value == null || kelasTerpilih.value == null || capaianPembelajaranC.text.trim().isEmpty) {
       Get.snackbar("Validasi Gagal", "Informasi umum (Mapel, Kelas, CP) wajib diisi.", backgroundColor: Colors.orange);
       return;
     }
@@ -140,13 +143,19 @@ class AtpFormController extends GetxController {
       return;
     }
 
+    // --- [MODIFIKASI] Dapatkan nama mapel dari ID yang tersimpan ---
+    final namaMapelTerpilih = daftarMapelUnik
+      .firstWhere((mapel) => mapel['id'] == idMapelTerpilih.value, orElse: () => {'nama': ''})['nama']!;
+
     AtpModel atpData = AtpModel(
       idAtp: originalAtp?.idAtp ?? '',
       idSekolah: configC.idSekolah,
       idPenyusun: configC.infoUser['uid'],
       namaPenyusun: configC.infoUser['alias'] ?? configC.infoUser['nama'],
       idTahunAjaran: configC.tahunAjaranAktif.value,
-      namaMapel: mapelTerpilih.value!,
+      // --- [MODIFIKASI] Simpan idMapel dan namaMapel ---
+      idMapel: idMapelTerpilih.value!,
+      namaMapel: namaMapelTerpilih,
       fase: faseTerpilih.value,
       kelas: int.parse(kelasTerpilih.value!),
       capaianPembelajaran: capaianPembelajaranC.text.trim(),

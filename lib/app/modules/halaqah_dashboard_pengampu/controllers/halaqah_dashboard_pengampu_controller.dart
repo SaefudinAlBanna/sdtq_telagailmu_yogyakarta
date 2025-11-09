@@ -6,11 +6,13 @@ import 'package:sdtq_telagailmu_yogyakarta/app/models/halaqah_group_model.dart';
 import 'package:sdtq_telagailmu_yogyakarta/app/routes/app_pages.dart';
 
 import '../../../controllers/auth_controller.dart';
+import '../../../controllers/dashboard_controller.dart';
 
 class HalaqahDashboardPengampuController extends GetxController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final ConfigController configC = Get.find<ConfigController>();
   final AuthController authC = Get.find<AuthController>();
+  final DashboardController dashC = Get.find<DashboardController>();
   
   // Gunakan Future karena daftar grup yang diampu relatif statis per semester
   late Future<List<HalaqahGroupModel>> listGroupFuture;
@@ -20,35 +22,37 @@ class HalaqahDashboardPengampuController extends GetxController {
     super.onInit();
     listGroupFuture = fetchMyGroups();
   }
-
+  
   Future<List<HalaqahGroupModel>> fetchMyGroups() async {
     final uid = authC.auth.currentUser!.uid;
     final tahunAjaran = configC.tahunAjaranAktif.value;
     final semester = configC.semesterAktif.value;
     final keySemester = "${tahunAjaran}_$semester";
     
-    // Map untuk menampung hasil gabungan dan menghindari duplikat
     final Map<String, HalaqahGroupModel> combinedGroups = {};
-
-    // --- QUERY 1: Ambil grup permanen (dari denormalisasi) ---
+  
+    // --- [SOLUSI BARU TANPA whereIn] ---
+    // 1. Ambil SEMUA grup di tahun ajaran aktif
+    final semuaGrupSnapshot = await _firestore
+        .collection('Sekolah').doc(configC.idSekolah)
+        .collection('tahunajaran').doc(tahunAjaran)
+        .collection('halaqah_grup')
+        .get();
+    
+    // 2. Ambil daftar ID grup permanen dari profil pengguna
     final user = configC.infoUser;
     final Map<String, dynamic> diampuData = user['grupHalaqahDiampu'] ?? {};
     final List<String> permanentGroupIds = List<String>.from(diampuData[keySemester] ?? []);
-
-    if (permanentGroupIds.isNotEmpty) {
-      final snapshot = await _firestore
-          .collection('Sekolah').doc(configC.idSekolah)
-          .collection('tahunajaran').doc(tahunAjaran)
-          .collection('halaqah_grup')
-          .where(FieldPath.documentId, whereIn: permanentGroupIds)
-          .get();
-      
-      for (var doc in snapshot.docs) {
+  
+    // 3. Filter di sisi klien
+    for (var doc in semuaGrupSnapshot.docs) {
+      if (permanentGroupIds.contains(doc.id)) {
         combinedGroups[doc.id] = HalaqahGroupModel.fromFirestore(doc);
       }
     }
-
-    // --- QUERY 2: Ambil grup pengganti untuk HARI INI ---
+    // --- AKHIR SOLUSI BARU ---
+  
+    // --- QUERY 2: Ambil grup pengganti (ini tetap efisien dan tidak perlu diubah) ---
     final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
     final substituteSnapshot = await _firestore
         .collection('Sekolah').doc(configC.idSekolah)
@@ -56,14 +60,13 @@ class HalaqahDashboardPengampuController extends GetxController {
         .collection('halaqah_grup')
         .where('penggantiHarian.$todayKey.idPengganti', isEqualTo: uid)
         .get();
-
+  
     for (var doc in substituteSnapshot.docs) {
       final group = HalaqahGroupModel.fromFirestore(doc);
-      group.isPengganti = true; // Tandai sebagai grup pengganti
-      combinedGroups[doc.id] = group; // Timpa jika sudah ada, atau tambahkan baru
+      group.isPengganti = true;
+      combinedGroups[doc.id] = group;
     }
-
-    // Konversi Map kembali ke List dan urutkan
+  
     final finalGroupList = combinedGroups.values.toList();
     finalGroupList.sort((a, b) => a.namaGrup.compareTo(b.namaGrup));
     

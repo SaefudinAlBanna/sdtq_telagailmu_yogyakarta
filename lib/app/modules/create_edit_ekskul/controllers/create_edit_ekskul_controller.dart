@@ -139,6 +139,64 @@ class CreateEditEkskulController extends GetxController {
     listPembinaTerpilih.removeAt(index);
   }
 
+  // Future<void> saveEkskul() async {
+  //   // 1. Validasi Form Input
+  //   if (!formKey.currentState!.validate()) {
+  //     Get.snackbar("Peringatan", "Harap periksa kembali data yang Anda isi.");
+  //     return;
+  //   }
+  //   // 2. Validasi Pembina & PJ
+  //   if (listPembinaTerpilih.isEmpty) {
+  //     Get.snackbar("Peringatan", "Harap tambahkan minimal satu pembina.");
+  //     return;
+  //   }
+  //   if (selectedPJ.value == null) {
+  //     Get.snackbar("Peringatan", "Harap pilih seorang Penanggung Jawab (PJ).");
+  //     return;
+  //   }
+    
+  //   isSaving.value = true;
+  //   try {
+  //     // Referensi ke dokumen di Firestore
+  //     final ekskulRef = _firestore.collection('Sekolah').doc(configC.idSekolah)
+  //         .collection('ekskul_ditawarkan').doc(ekskulId); // Jika ekskulId null, ID baru akan dibuat
+
+  //     // Ambil data PJ terpilih
+  //     final pj = selectedPJ.value!;
+  //     // Tentukan nama PJ (prioritaskan alias)
+  //     final namaPjToShow = pj.alias.isNotEmpty ? pj.alias : pj.nama;
+
+  //     // Siapkan data lengkap untuk disimpan
+  //     final Map<String, dynamic> dataToSave = {
+  //       'namaEkskul': namaC.text.trim(),
+  //       'deskripsi': deskripsiC.text.trim(),
+  //       'tujuan': tujuanC.text.trim(),
+  //       'jadwalTeks': jadwalC.text.trim(),
+  //       // 'biaya': int.tryParse(biayaC.text.trim()) ?? 0,
+  //       'biaya': biayaC.text.trim().isEmpty ? 0 : int.parse(biayaC.text.trim().replaceAll(',', '')),
+  //       // Gunakan list pembina yang sudah dikelola (sudah berisi alias jika ada)
+  //       'listPembina': listPembinaTerpilih.toList(),
+  //       'penanggungJawab': {
+  //         'id': pj.uid,
+  //         'nama': namaPjToShow, // Gunakan nama yang sudah diprioritaskan
+  //       },
+  //       'tahunAjaran': configC.tahunAjaranAktif.value,
+  //       'semester': configC.semesterAktif.value,
+  //     };
+
+  //     // Simpan data ke Firestore
+  //     await ekskulRef.set(dataToSave, SetOptions(merge: true));
+      
+  //     Get.back(); // Kembali ke halaman manajemen
+  //     Get.snackbar("Berhasil", "Data ekstrakurikuler telah disimpan.", backgroundColor: Colors.green, colorText: Colors.white);
+
+  //   } catch (e) {
+  //     Get.snackbar("Error", "Gagal menyimpan data: ${e.toString()}");
+  //   } finally {
+  //     isSaving.value = false;
+  //   }
+  // }
+
   Future<void> saveEkskul() async {
     // 1. Validasi Form Input
     if (!formKey.currentState!.validate()) {
@@ -159,12 +217,20 @@ class CreateEditEkskulController extends GetxController {
     try {
       // Referensi ke dokumen di Firestore
       final ekskulRef = _firestore.collection('Sekolah').doc(configC.idSekolah)
-          .collection('ekskul_ditawarkan').doc(ekskulId); // Jika ekskulId null, ID baru akan dibuat
+          .collection('ekskul_ditawarkan').doc(ekskulId);
 
       // Ambil data PJ terpilih
       final pj = selectedPJ.value!;
       // Tentukan nama PJ (prioritaskan alias)
       final namaPjToShow = pj.alias.isNotEmpty ? pj.alias : pj.nama;
+
+      // --- [PERBAIKAN UTAMA DI SINI] ---
+      // 1. Bersihkan string dari semua karakter non-digit (titik dan koma).
+      final String cleanedBiaya = biayaC.text.trim().replaceAll('.', '').replaceAll(',', '');
+      
+      // 2. Gunakan tryParse untuk konversi yang aman ke integer.
+      final int biayaFinal = int.tryParse(cleanedBiaya) ?? 0;
+      // --- [AKHIR PERBAIKAN] ---
 
       // Siapkan data lengkap untuk disimpan
       final Map<String, dynamic> dataToSave = {
@@ -172,12 +238,11 @@ class CreateEditEkskulController extends GetxController {
         'deskripsi': deskripsiC.text.trim(),
         'tujuan': tujuanC.text.trim(),
         'jadwalTeks': jadwalC.text.trim(),
-        'biaya': int.tryParse(biayaC.text.trim()) ?? 0,
-        // Gunakan list pembina yang sudah dikelola (sudah berisi alias jika ada)
+        'biaya': biayaFinal, // Gunakan variabel yang sudah bersih dan aman
         'listPembina': listPembinaTerpilih.toList(),
         'penanggungJawab': {
           'id': pj.uid,
-          'nama': namaPjToShow, // Gunakan nama yang sudah diprioritaskan
+          'nama': namaPjToShow,
         },
         'tahunAjaran': configC.tahunAjaranAktif.value,
         'semester': configC.semesterAktif.value,
@@ -191,6 +256,9 @@ class CreateEditEkskulController extends GetxController {
 
     } catch (e) {
       Get.snackbar("Error", "Gagal menyimpan data: ${e.toString()}");
+      // [TAMBAHAN DEBUG]
+      print("Error menyimpan ekskul: $e");
+      print("Nilai biaya yang coba diparsing: ${biayaC.text.trim().replaceAll('.', '').replaceAll(',', '')}");
     } finally {
       isSaving.value = false;
     }

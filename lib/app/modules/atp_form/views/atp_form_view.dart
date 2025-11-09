@@ -39,28 +39,35 @@ class AtpFormView extends GetView<AtpFormController> {
       children: [
         Text("Informasi Umum", style: Get.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
+        // --- [MODIFIKASI] Dropdown sekarang berbasis ID Mapel ---
         Obx(() => DropdownButtonFormField<String>(
-              value: controller.mapelTerpilih.value,
+              // Value sekarang adalah idMapelTerpilih
+              value: controller.idMapelTerpilih.value,
               hint: const Text("Pilih Mata Pelajaran"),
-              items: controller.daftarMapelUnik.map((mapel) => DropdownMenuItem(value: mapel, child: Text(mapel))).toList(),
+              // Items dibangun dari daftar mapel unik (list of map)
+              items: controller.daftarMapelUnik.map((mapel) {
+                return DropdownMenuItem(
+                  value: mapel['id'], // Value item adalah ID
+                  child: Text(mapel['nama']!), // Teks yang ditampilkan adalah Nama
+                );
+              }).toList(),
+              // onChanged sekarang mengirimkan ID mapel yang dipilih
               onChanged: controller.onMapelChanged,
               decoration: const InputDecoration(labelText: 'Mata Pelajaran', border: OutlineInputBorder()),
             )),
         const SizedBox(height: 12),
         Row(
           children: [
-            // --- [PERBAIKAN KUNCI] Dropdown Kelas yang Reaktif ---
             Expanded(child: Obx(() => DropdownButtonFormField<String>(
                   value: controller.kelasTerpilih.value,
                   hint: const Text("Pilih Kelas"),
-                  // Items sekarang diambil dari state yang dinamis
                   items: controller.daftarKelasTersedia.map((kelas) => DropdownMenuItem(value: kelas, child: Text("Kelas $kelas"))).toList(),
-                  // onChanged akan null (disabled) jika mapel belum dipilih
-                  onChanged: controller.mapelTerpilih.value == null ? null : controller.onKelasChanged,
+                  // --- [MODIFIKASI] Logika disabled sekarang bergantung pada idMapelTerpilih ---
+                  onChanged: controller.idMapelTerpilih.value == null ? null : controller.onKelasChanged,
                   decoration: InputDecoration(
                     labelText: 'Kelas',
                     border: const OutlineInputBorder(),
-                    filled: controller.mapelTerpilih.value == null,
+                    filled: controller.idMapelTerpilih.value == null,
                     fillColor: Colors.grey.shade200,
                   ),
                 ))),

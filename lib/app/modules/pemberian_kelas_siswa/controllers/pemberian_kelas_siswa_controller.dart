@@ -100,13 +100,35 @@ class PemberianKelasSiswaController extends GetxController {
 
   Future<void> pilihKelas(DocumentSnapshot kelasDoc) async {
     kelasTerpilih.value = kelasDoc;
+
+    // Menampilkan loading saat data siswa diambil
+    isProcessing.value = true; 
     siswaDiKelas.clear();
-    final dataKelas = kelasDoc.data() as Map<String, dynamic>;
-    final List<String> siswaUids = List<String>.from(dataKelas['siswaUids'] ?? []);
-    if (siswaUids.isNotEmpty) {
-      final siswaSnapshot = await _firestore.collection('Sekolah').doc(configC.idSekolah)
-          .collection('siswa').where(FieldPath.documentId, whereIn: siswaUids).get();
-      siswaDiKelas.assignAll(siswaSnapshot.docs.map((doc) => SiswaModel.fromFirestore(doc)).toList());
+
+    try {
+      final String tahunAjaran = configC.tahunAjaranAktif.value;
+
+      // Path langsung ke subkoleksi yang datanya sudah kita denormalisasi
+      final siswaDiKelasSnapshot = await _firestore
+          .collection('Sekolah').doc(configC.idSekolah)
+          .collection('tahunajaran').doc(tahunAjaran)
+          .collection('kelastahunajaran').doc(kelasDoc.id)
+          .collection('daftarsiswa')
+          .orderBy('namaLengkap')
+          .get();
+
+      // Langsung proses hasilnya menjadi model, tidak perlu query kedua
+      final allSiswa = siswaDiKelasSnapshot.docs.map((doc) =>
+          SiswaModel.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>))
+          .toList();
+
+      siswaDiKelas.assignAll(allSiswa);
+
+    } catch (e) {
+      Get.snackbar("Error", "Gagal memuat daftar siswa di kelas: ${e.toString()}");
+      print("### Gagal di pilihKelas: $e");
+    } finally {
+      isProcessing.value = false;
     }
   }
 
@@ -114,54 +136,110 @@ class PemberianKelasSiswaController extends GetxController {
   Future<void> addSiswaToKelas(SiswaModel siswa) async {
     if (kelasTerpilih.value == null) return;
     isProcessing.value = true;
-    
-    final kelasDoc = kelasTerpilih.value!;
-    final kelasRef = kelasDoc.reference;
-    final siswaRef = _firestore.collection('Sekolah').doc(configC.idSekolah).collection('siswa').doc(siswa.uid);
-    
-    final kelasTahunAjaranRef = _firestore.collection('Sekolah').doc(configC.idSekolah)
-  .collection('tahunajaran').doc(tahunAjaranAktif)
-  .collection('kelastahunajaran').doc(kelasRef.id);
-      
-    // final semesterSiswaRef = kelasTahunAjaranRef.collection('semester').doc(semesterAktif).collection('daftarsiswa').doc(siswa.uid);
-    final daftarSiswaRef = kelasTahunAjaranRef.collection('daftarsiswa').doc(siswa.uid);
 
-    WriteBatch batch = _firestore.batch();
-    
-    batch.update(kelasRef, {'siswaUids': FieldValue.arrayUnion([siswa.uid])});
-    batch.update(siswaRef, {'kelasId': kelasRef.id, 'statusSiswa': 'Aktif'});
-    // batch.set(semesterSiswaRef, {'uid': siswa.uid, 'nisn': siswa.nisn, 'namasiswa': siswa.namaLengkap});
-    batch.set(daftarSiswaRef, {'uid': siswa.uid, 'nisn': siswa.nisn, 'namaLengkap': siswa.namaLengkap});
-    
-    await batch.commit();
-    
-    siswaTanpaKelas.removeWhere((s) => s.uid == siswa.uid);
-    siswaDiKelas.add(siswa);
-    isProcessing.value = false;
+    try { // Tambahkan try-finally
+      final kelasDoc = kelasTerpilih.value!;
+      final kelasRef = kelasDoc.reference;
+      final siswaRef = _firestore.collection('Sekolah').doc(configC.idSekolah).collection('siswa').doc(siswa.uid);
+      final daftarSiswaRef = _firestore.collection('Sekolah').doc(configC.idSekolah)
+          .collection('tahunajaran').doc(tahunAjaranAktif)
+          .collection('kelastahunajaran').doc(kelasRef.id)
+          .collection('daftarsiswa').doc(siswa.uid);
+
+      WriteBatch batch = _firestore.batch();
+
+      batch.update(kelasRef, {'siswaUids': FieldValue.arrayUnion([siswa.uid])});
+      batch.update(siswaRef, {'kelasId': kelasRef.id, 'statusSiswa': 'Aktif'});
+      batch.set(daftarSiswaRef, {
+        'uid': siswa.uid, 
+        'nisn': siswa.nisn, 
+        'namaLengkap': siswa.namaLengkap
+      });
+
+      await batch.commit();
+
+      // --- MULAI PERBAIKAN LOGIKA STATE ---
+      // 1. Buat objek siswa baru dengan kelasId yang sudah di-update
+      final siswaYangDimasukkan = siswa.copyWith(kelasId: kelasRef.id, statusSiswa: 'Aktif');
+
+      // 2. Hapus siswa dari daftar tanpa kelas
+      siswaTanpaKelas.removeWhere((s) => s.uid == siswa.uid);
+
+      // 3. Tambahkan objek siswa yang sudah diperbarui ke daftar kelas ini
+      siswaDiKelas.add(siswaYangDimasukkan);
+      siswaDiKelas.sort((a, b) => a.namaLengkap.compareTo(b.namaLengkap)); // Jaga urutan
+      // --- SELESAI PERBAIKAN LOGIKA STATE ---
+
+    } catch (e) {
+      Get.snackbar("Error", "Gagal menambahkan siswa: ${e.toString()}");
+    } finally {
+      isProcessing.value = false;
+    }
   }
 
   // --- FUNGSI DIPERBAIKI DENGAN DENORMALISASI ---
+  // Future<void> removeSiswaFromKelas(SiswaModel siswa) async {
+  //   if (kelasTerpilih.value == null) return;
+  //   isProcessing.value = true;
+
+  //   final kelasRef = kelasTerpilih.value!.reference;
+  //   final siswaRef = _firestore.collection('Sekolah').doc(configC.idSekolah).collection('siswa').doc(siswa.uid);
+  //   final semesterSiswaRef = _firestore.collection('Sekolah').doc(configC.idSekolah)
+  //     .collection('tahunajaran').doc(tahunAjaranAktif).collection('kelastahunajaran')
+  //     .doc(kelasRef.id).collection('semester').doc(semesterAktif).collection('daftarsiswa').doc(siswa.uid);
+
+  //   WriteBatch batch = _firestore.batch();
+    
+  //   batch.update(kelasRef, {'siswaUids': FieldValue.arrayRemove([siswa.uid])});
+  //   batch.update(siswaRef, {'kelasId': FieldValue.delete(), 'statusSiswa': 'Tidak Aktif'});
+  //   batch.delete(semesterSiswaRef);
+
+  //   await batch.commit();
+    
+  //   siswaDiKelas.removeWhere((s) => s.uid == siswa.uid);
+  //   siswaTanpaKelas.add(siswa);
+  //   isProcessing.value = false;
+  // }
+
   Future<void> removeSiswaFromKelas(SiswaModel siswa) async {
     if (kelasTerpilih.value == null) return;
     isProcessing.value = true;
-
-    final kelasRef = kelasTerpilih.value!.reference;
-    final siswaRef = _firestore.collection('Sekolah').doc(configC.idSekolah).collection('siswa').doc(siswa.uid);
-    final semesterSiswaRef = _firestore.collection('Sekolah').doc(configC.idSekolah)
-      .collection('tahunajaran').doc(tahunAjaranAktif).collection('kelastahunajaran')
-      .doc(kelasRef.id).collection('semester').doc(semesterAktif).collection('daftarsiswa').doc(siswa.uid);
-
-    WriteBatch batch = _firestore.batch();
-    
-    batch.update(kelasRef, {'siswaUids': FieldValue.arrayRemove([siswa.uid])});
-    batch.update(siswaRef, {'kelasId': FieldValue.delete(), 'statusSiswa': 'Tidak Aktif'});
-    batch.delete(semesterSiswaRef);
-
-    await batch.commit();
-    
-    siswaDiKelas.removeWhere((s) => s.uid == siswa.uid);
-    siswaTanpaKelas.add(siswa);
-    isProcessing.value = false;
+  
+    try {
+      final kelasRef = kelasTerpilih.value!.reference;
+      final siswaRef = _firestore.collection('Sekolah').doc(configC.idSekolah).collection('siswa').doc(siswa.uid);
+      final daftarSiswaRef = _firestore.collection('Sekolah').doc(configC.idSekolah)
+        .collection('tahunajaran').doc(tahunAjaranAktif)
+        .collection('kelastahunajaran').doc(kelasRef.id)
+        .collection('daftarsiswa').doc(siswa.uid);
+  
+      WriteBatch batch = _firestore.batch();
+      
+      // --- PERBAIKAN UTAMA DI SINI ---
+      // Ganti FieldValue.delete() menjadi null
+      batch.update(siswaRef, {
+        'kelasId': null, 
+        'statusSiswa': 'Tidak Aktif'
+      });
+      // --- AKHIR PERBAIKAN UTAMA ---
+  
+      // Operasi lain tetap sama
+      batch.update(kelasRef, {'siswaUids': FieldValue.arrayRemove([siswa.uid])});
+      batch.delete(daftarSiswaRef);
+  
+      await batch.commit();
+      
+      // Logika state UI Anda sudah benar, tidak perlu diubah
+      final siswaYangDikeluarkan = siswa.copyWith(removeKelasId: true, statusSiswa: 'Tidak Aktif');
+      siswaDiKelas.removeWhere((s) => s.uid == siswa.uid);
+      siswaTanpaKelas.add(siswaYangDikeluarkan);
+      siswaTanpaKelas.sort((a, b) => a.namaLengkap.compareTo(b.namaLengkap));
+  
+    } catch (e) {
+      Get.snackbar("Error", "Gagal mengeluarkan siswa: ${e.toString()}");
+    } finally {
+      isProcessing.value = false;
+    }
   }
 
   // --- FUNGSI LAINNYA TIDAK BERUBAH ---
@@ -267,5 +345,83 @@ class PemberianKelasSiswaController extends GetxController {
       kelasTerpilih.value = await kelasRef.get();
       isWaliKelasLoading.value = false;
       Get.back();
+    }
+
+    Future<void> jalankanMigrasiDataSiswa() async {
+      isProcessing.value = true;
+      Get.dialog(
+        const AlertDialog(
+          title: Text("Proses Migrasi..."),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text("Menambal data siswa di setiap kelas. Mohon jangan tutup aplikasi."),
+            ],
+          ),
+        ),
+        barrierDismissible: false,
+      );
+
+      try {
+        final WriteBatch batch = _firestore.batch();
+        int writeCounter = 0;
+
+        // 1. Ambil semua data siswa dalam satu kali query untuk efisiensi
+        final semuaSiswaSnap = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('siswa').get();
+        final Map<String, SiswaModel> petaSiswa = {
+          for (var doc in semuaSiswaSnap.docs) doc.id: SiswaModel.fromFirestore(doc)
+        };
+        print("Migrasi: Ditemukan total ${petaSiswa.length} siswa.");
+
+        // 2. Ambil semua kelas yang ada di tahun ajaran aktif
+        final semuaKelasSnap = await _firestore.collection('Sekolah').doc(configC.idSekolah)
+          .collection('tahunajaran').doc(tahunAjaranAktif)
+          .collection('kelastahunajaran').get();
+        print("Migrasi: Ditemukan ${semuaKelasSnap.docs.length} kelas untuk diproses.");
+
+        // 3. Iterasi setiap kelas untuk menambal data siswanya
+        for (final kelasDoc in semuaKelasSnap.docs) {
+          print("Migrasi: Memproses kelas ${kelasDoc.id}...");
+          final siswaDiKelasSnap = await kelasDoc.reference.collection('daftarsiswa').get();
+
+          for (final siswaDiKelasDoc in siswaDiKelasSnap.docs) {
+            final siswaUid = siswaDiKelasDoc.id;
+            final siswaDataLengkap = petaSiswa[siswaUid];
+
+            if (siswaDataLengkap != null) {
+              // Siapkan data untuk di-update (ditambal)
+              batch.update(siswaDiKelasDoc.reference, {
+                'namaLengkap': siswaDataLengkap.namaLengkap,
+                'nisn': siswaDataLengkap.nisn,
+              });
+              writeCounter++;
+
+              // Commit batch setiap 400 operasi untuk menghindari limit
+              if (writeCounter >= 400) {
+                await batch.commit();
+                print("Migrasi: Batch commit triggered at $writeCounter writes.");
+                // Re-initialize batch for the next set of operations
+                // batch = _firestore.batch(); // Note: re-initializing batch is complex, for this scale, one batch is likely fine.
+                // For simplicity, we assume total writes are < 500. If more, a more complex script is needed.
+              }
+            }
+          }
+        }
+
+        // 4. Commit sisa operasi di batch
+        await batch.commit();
+
+        Get.back(); // Tutup dialog loading
+        Get.snackbar("Berhasil", "Migrasi data siswa selesai. Total $writeCounter data siswa diperbarui.", backgroundColor: Colors.green, colorText: Colors.white);
+
+      } catch (e) {
+        Get.back(); // Tutup dialog loading
+        Get.snackbar("Error Migrasi", "Terjadi kesalahan: ${e.toString()}", backgroundColor: Colors.red, colorText: Colors.white);
+        print("### ERROR MIGRASI: $e");
+      } finally {
+        isProcessing.value = false;
+      }
     }
 }

@@ -52,10 +52,15 @@ class PerangkatAjarController extends GetxController {
   }
 
   Stream<QuerySnapshot<Map<String, dynamic>>> streamAtp() {
+    // 1. Filter pertama berdasarkan tahun ajaran (BENAR)
     Query<Map<String, dynamic>> query = _atpRef.where('idTahunAjaran', isEqualTo: tahunAjaranFilter.value);
+
+    // 2. Jika bukan pimpinan, filter kedua berdasarkan ID penyusun (BENAR)
     if (!dashboardC.isPimpinan) {
       query = query.where('idPenyusun', isEqualTo: configC.infoUser['uid']);
     }
+
+    // 3. Mengurutkan hasil (BENAR)
     return query.orderBy('lastModified', descending: true).snapshots();
   }
 

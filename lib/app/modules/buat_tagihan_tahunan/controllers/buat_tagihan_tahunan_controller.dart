@@ -74,19 +74,46 @@ class BuatTagihanTahunanController extends GetxController {
   }
 
   Future<void> _fetchSiswaKelas1() async {
+    // Query untuk mendapatkan ID kelas 1 (A-F)
     final kelasSnap = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('kelas')
         .where('namaKelas', whereIn: ['1A', '1B', '1C', '1D', '1E', '1F'])
         .where('tahunAjaran', isEqualTo: tahunAjaranAktif)
         .get();
-    
+
     final List<String> kelas1Ids = kelasSnap.docs.map((d) => d.id).toList();
 
-    if (kelas1Ids.isNotEmpty) {
-      final siswaSnap = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('siswa')
-          .where('kelasId', whereIn: kelas1Ids).get();
-      
-      daftarSiswaKelas1.assignAll(siswaSnap.docs.map((d) => SiswaKeuanganModel.fromFirestore(d)).toList());
+    // Bersihkan data lama sebelum diisi
+    daftarSiswaKelas1.clear();
+    uangPangkalControllers.values.forEach((c) => c.dispose());
+    uangPangkalControllers.clear();
 
+    if (kelas1Ids.isNotEmpty) {
+      // --- MULAI LOGIKA HOTFIX "CHUNKING" ---
+      List<SiswaKeuanganModel> allSiswaKelas1 = [];
+      const chunkSize = 30;
+
+      for (var i = 0; i < kelas1Ids.length; i += chunkSize) {
+        // Ambil "potongan" ID kelas, maksimal 30
+        final chunk = kelas1Ids.sublist(i, i + chunkSize > kelas1Ids.length ? kelas1Ids.length : i + chunkSize);
+
+        // Jalankan query 'whereIn' untuk potongan tersebut
+        final siswaSnap = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('siswa')
+            .where('kelasId', whereIn: chunk)
+            .get();
+
+        // Tambahkan hasilnya ke list sementara
+        allSiswaKelas1.addAll(
+          siswaSnap.docs.map((d) => SiswaKeuanganModel.fromFirestore(d)).toList()
+        );
+      }
+      // --- SELESAI LOGIKA HOTFIX ---
+
+      // Urutkan hasilnya berdasarkan nama
+      allSiswaKelas1.sort((a, b) => a.namaLengkap.compareTo(b.namaLengkap));
+
+      daftarSiswaKelas1.assignAll(allSiswaKelas1);
+
+      // Siapkan text controllers setelah daftar siswa terisi
       for (var siswa in daftarSiswaKelas1) {
         uangPangkalControllers[siswa.uid] = TextEditingController(text: masterBiaya['uangPangkal'].toString());
       }
@@ -151,7 +178,12 @@ class BuatTagihanTahunanController extends GetxController {
       final existingTagihanSnap = await _firestore.collectionGroup('tagihan')
           .where('idTahunAjaran', isEqualTo: tahunAjaranAktif)
           .where('jenisPembayaran', isEqualTo: 'SPP').get();
-      final Set<String> existingTagihanIds = existingTagihanSnap.docs.map((d) => d.id).toSet();
+
+      // BUAT KUNCI GABUNGAN: {idSiswa}-{idTagihan}
+      final Set<String> existingCompositeKeys = existingTagihanSnap.docs.map((d) {
+        final data = d.data();
+        return "${data['idSiswa']}-${d.id}";
+      }).toSet();
 
       final WriteBatch batch = _firestore.batch();
       final tahun = int.parse(tahunAjaranAktif.split('-').first);
@@ -176,13 +208,14 @@ class BuatTagihanTahunanController extends GetxController {
           final tahunTagihan = (bulanMulai + i > 12) ? tahun + 1 : tahun;
           final namaBulan = DateFormat('MMMM', 'id_ID').format(DateTime(tahunTagihan, bulan));
           final tagihanId = 'SPP-$tahunTagihan-$bulan';
+          final compositeKey = "${siswa.uid}-$tagihanId";
           
           final tagihanRef = keuanganSiswaRef.collection('tagihan').doc(tagihanId);
 
-          if (existingTagihanIds.contains(tagihanId)) {
-            batch.update(tagihanRef, {'jumlahTagihan': siswa.spp});
-          } else {
-            batch.set(tagihanRef, {
+          if (existingCompositeKeys.contains(compositeKey)) {
+              batch.update(tagihanRef, {'jumlahTagihan': siswa.spp});
+            } else {
+              batch.set(tagihanRef, {
               'jenisPembayaran': 'SPP', 'deskripsi': 'SPP Bulan $namaBulan $tahunTagihan',
               'jumlahTagihan': siswa.spp, 'jumlahTerbayar': 0, 'status': 'Belum Lunas',
               'tanggalTerbit': Timestamp.now(), 'tanggalJatuhTempo': Timestamp.fromDate(DateTime(tahunTagihan, bulan, 10)),

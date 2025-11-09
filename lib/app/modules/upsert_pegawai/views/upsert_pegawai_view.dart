@@ -51,10 +51,17 @@ class UpsertPegawaiView extends GetView<UpsertPegawaiController> {
               const SizedBox(height: 16),
 
               Obx(() => DropdownButtonFormField<String>(
-                value: controller.jabatanTerpilih.value,
-                decoration: _buildInputDecoration(labelText: 'Jabatan Utama', icon: Icons.work),
-                hint: const Text('Pilih satu jabatan...'),
-                items: controller.configC.daftarRoleTersedia.map((jabatan) => DropdownMenuItem(value: jabatan, child: Text(jabatan))).toList(),
+                  value: controller.jabatanTerpilih.value,
+                  decoration: _buildInputDecoration(labelText: 'Jabatan Utama', icon: Icons.work),
+                  hint: const Text('Pilih satu jabatan...'),
+                  
+                  // --- MULAI PERBAIKAN ---
+                  // 1. Ambil daftar role dari ConfigController
+                  // 2. .toSet() -> Menghilangkan semua duplikat
+                  // 3. .toList() -> Mengubahnya kembali menjadi list
+                  items: controller.configC.daftarRoleTersedia.toSet().toList().map((jabatan) {
+                    return DropdownMenuItem(value: jabatan, child: Text(jabatan));
+                  }).toList(),
                 onChanged: (v) => controller.jabatanTerpilih.value = v,
                 validator: (v) => controller.validator(v, 'Jabatan'),
               )),

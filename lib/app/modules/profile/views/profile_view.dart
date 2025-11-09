@@ -46,7 +46,7 @@ class ProfileView extends GetView<ProfileController> {
                               shape: const CircleBorder(),
                               clipBehavior: Clip.antiAlias,
                               child: InkWell(
-                                onTap: () => controller.pickImage(),
+                                onTap: () => controller.pickAndCropImage(),
                                 child: const Padding(
                                   padding: EdgeInsets.all(8.0),
                                   child: Icon(Icons.camera_alt, color: Colors.white, size: 20),

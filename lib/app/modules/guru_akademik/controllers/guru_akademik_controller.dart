@@ -26,17 +26,36 @@ class GuruAkademikController extends GetxController {
   final RxBool isWaliKelas = false.obs;
   final RxString kelasDiampuId = "".obs;
 
+  // @override
+  // void onInit() {
+  //   super.onInit();
+  //   ever(configC.infoUser, (_) => _updateWaliKelasStatus());
+  // }
+
+  // @override
+  // void onReady() {
+  //   super.onReady();
+  //   fetchMapelDiampu();
+  //   _updateWaliKelasStatus();
+  // }
+
   @override
   void onInit() {
     super.onInit();
-    ever(configC.infoUser, (_) => _updateWaliKelasStatus());
-  }
-
-  @override
-  void onReady() {
-    super.onReady();
+    // Dengarkan sinyal bahwa data pengguna sudah siap
+    ever(configC.isUserDataReady, (bool isReady) {
+    if (isReady) {
+    // Hanya jalankan fetch data setelah ConfigController siap
     fetchMapelDiampu();
     _updateWaliKelasStatus();
+    }
+  });
+
+  // Jika saat controller ini dibuat data sudah siap, jalankan langsung
+    if (configC.isUserDataReady.value) {
+  fetchMapelDiampu();
+  _updateWaliKelasStatus();
+  }
   }
 
   void _updateWaliKelasStatus() {

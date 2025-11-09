@@ -22,6 +22,7 @@ class ConfigController extends GetxController {
   final Rx<AppStatus> status = AppStatus.loading.obs; 
   final RxBool isUserDataReady = false.obs; // Sinyal data pengguna sudah lengkap
   
+  final RxBool isPengujiHalaqah = false.obs;
   final RxString tahunAjaranAktif = "".obs;
   final RxString semesterAktif = "".obs;
   final RxList<String> daftarRoleTersedia = <String>[].obs;
@@ -43,19 +44,22 @@ class ConfigController extends GetxController {
     print("🚀 [ConfigController] onInit called.");
     idSekolah = dotenv.env['ID_SEKOLAH']!;
     print("⚙️ [ConfigController] ID_SEKOLAH loaded: $idSekolah");
-    _loadProfileFromCache(); // Coba muat profil dari cache lebih awal
+    _loadProfileFromCache();
     
     _userSubscription = _authController.authStateChanges.listen((user) async {
       print("🔑 [ConfigController] Auth state changed: User is ${user == null ? 'null (unauthenticated)' : 'authenticated'}.");
       
-      // Reset isUserDataReady saat auth state berubah, karena data perlu disinkronkan ulang
+      // --- PERBAIKAN KRUSIAL DI SINI ---
+      // Jika flag ini aktif, berarti ada proses di latar belakang.
+      // Abaikan perubahan auth state untuk sementara waktu.
+      if (isCreatingNewUser.value) {
+        print("🤫 [ConfigController] Mode senyap aktif. Perubahan auth diabaikan.");
+        return; // Hentikan eksekusi listener
+      }
+      // --- AKHIR PERBAIKAN ---
+
       isUserDataReady.value = false; 
 
-      if (isCreatingNewUser.value) {
-        print("[AUTH] Mode Senyap Aktif. Perubahan auth diabaikan.");
-        return;
-      }
-      
       if (user == null) {
         print("🗑️ [ConfigController] User is null. Clearing config.");
         await clearUserConfig();
@@ -103,7 +107,8 @@ class ConfigController extends GetxController {
       await Future.wait([
         _syncRoleManagementDataIfAllowed(),
         _checkIsWaliKelas(uid),
-        _syncKonfigurasiDashboard(), 
+        _syncKonfigurasiDashboard(),
+        _syncPengujiStatus(uid),
       ]);
       print("🎉 [ConfigController] All parallel sync tasks finished.");
         
@@ -343,6 +348,23 @@ class ConfigController extends GetxController {
       }
     } catch (e) {
       print("### Gagal mengambil konfigurasi tanggal akademik: $e");
+    }
+  }
+
+  Future<void> _syncPengujiStatus(String uid) async {
+    try {
+      final doc = await _firestore.collection('Sekolah').doc(idSekolah)
+          .collection('pengaturan').doc('halaqah_config').get();
+      
+      if (doc.exists && doc.data() != null) {
+        final Map<String, dynamic> daftarPengujiMap = doc.data()!['daftarPenguji'] ?? {};
+        isPengujiHalaqah.value = daftarPengujiMap.containsKey(uid);
+      } else {
+        isPengujiHalaqah.value = false;
+      }
+    } catch (e) {
+      isPengujiHalaqah.value = false;
+      print("### Gagal memeriksa status penguji: $e");
     }
   }
 

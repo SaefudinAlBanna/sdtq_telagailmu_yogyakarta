@@ -43,7 +43,7 @@ class LoginView extends GetView<LoginController> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    "PKBM SDTQ Telagailmu",
+                    "PKBM STQ Telagailmu",
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.indigo.shade700),
                   ),
                   const SizedBox(height: 8),

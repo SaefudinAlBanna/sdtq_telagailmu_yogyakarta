@@ -61,24 +61,34 @@ class CreateEditBukuController extends GetxController {
       final ref = _firestore.collection('Sekolah').doc(configC.idSekolah)
           .collection('tahunajaran').doc(configC.tahunAjaranAktif.value)
           .collection('buku_ditawarkan').doc(bukuId);
-
+  
+      // --- [PERBAIKAN UTAMA DI SINI] ---
+      // 1. Bersihkan string dari semua karakter non-digit.
+      final String cleanedHarga = hargaC.text.replaceAll('.', '').replaceAll(',', '');
+      
+      // 2. Gunakan tryParse untuk konversi yang aman ke integer.
+      final int hargaFinal = int.tryParse(cleanedHarga) ?? 0;
+      // --- [AKHIR PERBAIKAN] ---
+  
       final dataToSave = {
         'namaItem': namaC.text.trim(),
         'deskripsi': deskripsiC.text.trim(),
-        'harga': int.tryParse(hargaC.text) ?? 0,
+        'harga': hargaFinal, // Gunakan variabel yang sudah bersih dan aman
         'isPaket': isPaket.value,
         'daftarBukuDiPaket': isPaket.value ? daftarBukuDiPaket.toList() : [],
         'tahunAjaran': configC.tahunAjaranAktif.value,
-        // 'targetKelas' bisa ditambahkan di sini jika perlu
       };
-
+  
       await ref.set(dataToSave, SetOptions(merge: true));
       
       Get.back();
       Get.snackbar("Berhasil", "Data buku telah disimpan.", backgroundColor: Colors.green);
-
+  
     } catch (e) {
       Get.snackbar("Error", "Gagal menyimpan data: ${e.toString()}");
+      print("Error menyimpan buku: $e");
+      // [TAMBAHAN DEBUG] Jika masih error, print nilai cleanedHarga untuk investigasi
+      print("Nilai harga yang coba diparsing: ${hargaC.text.replaceAll('.', '').replaceAll(',', '')}");
     } finally {
       isSaving.value = false;
     }

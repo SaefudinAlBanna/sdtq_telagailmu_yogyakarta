@@ -1,4 +1,5 @@
-// app/models/modul_ajar_model.dart
+// app/models/modul_ajar_model.dart (SUDAH DIPERBAIKI)
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 
@@ -10,7 +11,9 @@ class ModulAjarModel {
   String idPenyusun;
   String namaPenyusun;
   String idTahunAjaran;
-  String mapel;
+  // --- [MODIFIKASI] Menambahkan idMapel ---
+  String idMapel;
+  String mapel; // Nama field ini tetap 'mapel' agar konsisten dengan model
   int kelas;
   String fase;
   String alokasiWaktu;
@@ -22,11 +25,11 @@ class ModulAjarModel {
   List<String> targetPesertaDidik;
   String modelPembelajaran;
   List<String> elemen;
-  String tujuanPembelajaran; // Bisa menggunakan format markdown
+  String tujuanPembelajaran;
   String pemahamanBermakna;
   List<String> pertanyaanPemantik;
   List<SesiPembelajaran> kegiatanPembelajaran;
-  String status; // 'draf' atau 'dipublikasikan'
+  String status;
   Timestamp createdAt;
   Timestamp lastModified;
 
@@ -36,9 +39,11 @@ class ModulAjarModel {
     required this.idPenyusun,
     required this.namaPenyusun,
     required this.idTahunAjaran,
+    required this.idMapel,
     required this.mapel,
     required this.kelas,
     required this.fase,
+    // ... sisa constructor sama
     required this.alokasiWaktu,
     required this.kompetensiAwal,
     required this.profilPancasila,
@@ -64,6 +69,7 @@ class ModulAjarModel {
       idPenyusun: json['idPenyusun'] ?? '',
       namaPenyusun: json['namaPenyusun'] ?? '',
       idTahunAjaran: json['idTahunAjaran'] ?? '',
+      idMapel: json['idMapel'] ?? '',
       mapel: json['mapel'] ?? '',
       kelas: json['kelas'] ?? 0,
       fase: json['fase'] ?? '',
@@ -95,9 +101,11 @@ class ModulAjarModel {
       'idPenyusun': idPenyusun,
       'namaPenyusun': namaPenyusun,
       'idTahunAjaran': idTahunAjaran,
+      'idMapel': idMapel,
       'mapel': mapel,
       'kelas': kelas,
       'fase': fase,
+      // ... sisa toJson sama
       'alokasiWaktu': alokasiWaktu,
       'kompetensiAwal': kompetensiAwal,
       'profilPancasila': profilPancasila,
@@ -117,14 +125,16 @@ class ModulAjarModel {
     };
   }
   
-  // Fungsi duplikasi
+  // Fungsi copyWith tidak perlu diubah, hanya perlu memastikan field baru ikut
   ModulAjarModel copyWith({String? idModul, String? idTahunAjaran}) {
     return ModulAjarModel(
+      // ... (semua field disalin, pastikan idMapel juga)
       idModul: idModul ?? this.idModul,
       idSekolah: this.idSekolah,
       idPenyusun: this.idPenyusun,
       namaPenyusun: this.namaPenyusun,
       idTahunAjaran: idTahunAjaran ?? this.idTahunAjaran,
+      idMapel: this.idMapel, // Penting!
       mapel: this.mapel,
       kelas: this.kelas,
       fase: this.fase,
@@ -141,13 +151,13 @@ class ModulAjarModel {
       pemahamanBermakna: this.pemahamanBermakna,
       pertanyaanPemantik: List<String>.from(this.pertanyaanPemantik),
       kegiatanPembelajaran: this.kegiatanPembelajaran.map((e) => e.copyWith()).toList(),
-      status: 'draf', // Selalu set ke draf saat diduplikasi
+      status: 'draf',
       createdAt: Timestamp.now(),
       lastModified: Timestamp.now(),
     );
   }
 }
-
+// Class SesiPembelajaran tidak perlu diubah.
 class SesiPembelajaran {
   final int sesi;
   final String judulSesi;

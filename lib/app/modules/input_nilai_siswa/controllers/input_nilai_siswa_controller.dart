@@ -4,11 +4,12 @@ import 'dart:async'; // Pastikan ini ada
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:sdtq_telagailmu_yogyakarta/app/controllers/auth_controller.dart';
-import 'package:sdtq_telagailmu_yogyakarta/app/controllers/config_controller.dart';
-import 'package:sdtq_telagailmu_yogyakarta/app/models/atp_model.dart';
-import 'package:sdtq_telagailmu_yogyakarta/app/models/nilai_harian_model.dart';
-import 'package:sdtq_telagailmu_yogyakarta/app/models/siswa_model.dart';
+
+import '../../../controllers/auth_controller.dart';
+import '../../../controllers/config_controller.dart';
+import '../../../models/atp_model.dart';
+import '../../../models/nilai_harian_model.dart';
+import '../../../models/siswa_model.dart';
 
 class InputNilaiSiswaController extends GetxController with GetTickerProviderStateMixin {
   final ConfigController configC = Get.find<ConfigController>();
@@ -151,16 +152,34 @@ class InputNilaiSiswaController extends GetxController with GetTickerProviderSta
     try {
       final kelasString = idKelas.split('-').first.replaceAll(RegExp(r'[^0-9]'), '');
       final kelasAngka = int.tryParse(kelasString) ?? 0;
+
+      // --- [PERBAIKAN KUNCI DI SINI] ---
+      // Variabel 'idMapel' yang kita terima adalah format gabungan (e.g., "mapel-kelas-tahun").
+      // Kita perlu mengekstrak bagian pertamanya untuk dicocokkan dengan data di koleksi 'atp'.
+      final String pureIdMapel = idMapel.split('-').first;
+      // ---------------------------------
+
+      // Debugging: Pastikan semua variabel memiliki nilai yang diharapkan
+      print("### Mencari ATP dengan: idTahunAjaran=$idTahunAjaran, idMapel (pure)=$pureIdMapel, kelas=$kelasAngka");
+
       final snapshot = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('atp')
           .where('idTahunAjaran', isEqualTo: idTahunAjaran)
-          .where('namaMapel', isEqualTo: namaMapel)
-          .where('kelas', isEqualTo: kelasAngka).limit(1).get();
-      if (snapshot.docs.isNotEmpty) {
-        atpModel.value = AtpModel.fromJson(snapshot.docs.first.data());
-      } else {
+          .where('idMapel', isEqualTo: pureIdMapel) // <-- Gunakan idMapel murni hasil ekstraksi
+          .where('kelas', isEqualTo: kelasAngka)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isEmpty) {
+        print("### Info ATP: Tidak ditemukan ATP yang cocok.");
         atpModel.value = null;
+      } else {
+        print("### Info ATP: Ditemukan! Mengisi model ATP.");
+        atpModel.value = AtpModel.fromJson(snapshot.docs.first.data());
       }
-    } catch (e) { print("### Info ATP: Gagal memuat data ATP: $e"); atpModel.value = null; }
+    } catch (e) {
+      print("### Error Fetch ATP: Gagal memuat data ATP: $e");
+      atpModel.value = null;
+    }
   }
 
   Future<void> fetchNilaiDanDeskripsiSiswa() async {
@@ -179,20 +198,85 @@ class InputNilaiSiswaController extends GetxController with GetTickerProviderSta
     else { capaianTpSiswa[tp] = status; }
   }
 
+  // Future<void> simpanSemuaCapaian() async {
+  //   isSaving.value = true;
+  //   try {
+  //     await siswaMapelRef.set({
+  //       'deskripsi_capaian': deskripsiCapaianC.text.trim(),
+  //       'capaian_tp': capaianTpSiswa,
+  //       'idGuruPencatat': idGuruPencatat,
+  //       'namaGuruPencatat': namaGuruPencatat,
+  //       'aliasGuruPencatatAkhir': aliasGuruPencatat, // Perbaikan: Gunakan 'aliasGuruPencatatAkhir'
+  //       'lastEdited': FieldValue.serverTimestamp(),
+  //     }, SetOptions(merge: true));
+  //     Get.snackbar("Berhasil", "Capaian pembelajaran berhasil disimpan.");
+  //   } catch (e) { Get.snackbar("Error", "Gagal menyimpan capaian: $e"); } 
+  //   finally { isSaving.value = false; }
+  // }
+
   Future<void> simpanSemuaCapaian() async {
     isSaving.value = true;
     try {
+      String deskripsiFinal;
+  
+      // --- [LOGIKA BARU DI SINI] ---
+      // Jika ada data capaian TP yang dipilih, rakit deskripsinya
+      if (capaianTpSiswa.isNotEmpty) {
+        final tercapaiList = <String>[];
+        final perluBimbinganList = <String>[];
+  
+        // 1. Pisahkan TP berdasarkan statusnya
+        capaianTpSiswa.forEach((tp, status) {
+          if (status == 'Tercapai') {
+            tercapaiList.add(tp);
+          } else if (status == 'Perlu Bimbingan') {
+            perluBimbinganList.add(tp);
+          }
+        });
+  
+        // 2. Bangun string deskripsi menggunakan StringBuffer untuk efisiensi
+        final buffer = StringBuffer();
+        
+        if (tercapaiList.isNotEmpty) {
+          buffer.writeln("Ananda telah menunjukkan penguasaan yang baik dalam:");
+          for (var tp in tercapaiList) {
+            buffer.writeln("- $tp");
+          }
+        }
+        
+        if (perluBimbinganList.isNotEmpty) {
+          if (buffer.isNotEmpty) buffer.writeln(); // Beri spasi jika ada bagian "Tercapai"
+          buffer.writeln("Ananda perlu bimbingan lebih lanjut dalam:");
+          for (var tp in perluBimbinganList) {
+            buffer.writeln("- $tp");
+          }
+        }
+        
+        deskripsiFinal = buffer.toString().trim();
+  
+      } else {
+        // Jika tidak ada TP yang dipilih, gunakan teks dari input manual (jika ada)
+        deskripsiFinal = deskripsiCapaianC.text.trim();
+      }
+      // --- [AKHIR LOGIKA BARU] ---
+  
+      // Simpan kedua data: deskripsi yang sudah dirakit dan data mentah capaian TP
       await siswaMapelRef.set({
-        'deskripsi_capaian': deskripsiCapaianC.text.trim(),
+        'deskripsi_capaian': deskripsiFinal,
         'capaian_tp': capaianTpSiswa,
         'idGuruPencatat': idGuruPencatat,
         'namaGuruPencatat': namaGuruPencatat,
-        'aliasGuruPencatatAkhir': aliasGuruPencatat, // Perbaikan: Gunakan 'aliasGuruPencatatAkhir'
+        'aliasGuruPencatatAkhir': aliasGuruPencatat,
         'lastEdited': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+  
       Get.snackbar("Berhasil", "Capaian pembelajaran berhasil disimpan.");
-    } catch (e) { Get.snackbar("Error", "Gagal menyimpan capaian: $e"); } 
-    finally { isSaving.value = false; }
+  
+    } catch (e) {
+      Get.snackbar("Error", "Gagal menyimpan capaian: $e");
+    } finally {
+      isSaving.value = false;
+    }
   }
 
   Future<void> fetchBobotNilai() async {
@@ -322,51 +406,6 @@ class InputNilaiSiswaController extends GetxController with GetTickerProviderSta
     } catch(e) { Get.snackbar("Error", "Gagal menyimpan nilai: $e"); }
     finally { isSaving.value = false; }
   }
-
-  // void hitungNilaiAkhir() {
-  //   if (bobotNilai.isEmpty) {
-  //     nilaiAkhir.value = 0.0;
-  //     return;
-  //   }
-    
-  //   double avgTugasHarian = _calculateAverage("Harian/PR");
-  //   double avgUlanganHarian = _calculateAverage('Ulangan Harian');
-  //   double totalNilaiTambahan = _calculateSum('Nilai Tambahan');
-  //   int pts = nilaiPTS.value ?? 0;
-  //   int pas = nilaiPAS.value ?? 0;
-
-  //   int bobotTugas = bobotNilai['tugasHarian'] ?? 0;
-  //   int bobotUlangan = bobotNilai['ulanganHarian'] ?? 0;
-  //   int bobotPTS = bobotNilai['pts'] ?? 0;
-  //   int bobotPAS = bobotNilai['pas'] ?? 0;
-    
-  //   int totalBobot = bobotTugas + bobotUlangan + bobotPTS + bobotPAS;
-  //   if (totalBobot == 0) {
-  //     nilaiAkhir.value = 0.0;
-  //     return;
-  //   }
-    
-  //   double finalScore = 
-  //       ((avgTugasHarian * bobotTugas) +
-  //       (avgUlanganHarian * bobotUlangan) +
-  //       (pts * bobotPTS) +
-  //       (pas * bobotPAS)) / totalBobot; 
-    
-  //   finalScore += totalNilaiTambahan;
-
-  //   nilaiAkhir.value = finalScore.clamp(0.0, 100.0);
-    
-  //   siswaMapelRef.set({
-  //     'nilai_akhir': nilaiAkhir.value,
-  //     'namaMapel': namaMapel,
-  //     'namaGuru': namaGuru, // Nama guru pengampu mapel
-  //     'idGuru': idGuru,     // ID guru pengampu mapel
-  //     'aliasGuruPencatatAkhir': aliasGuruPencatat, // [PERBAIKAN] Simpan alias guru pencatat/pengampu ke field 'aliasGuruPencatatAkhir'
-  //     'idGuruPencatatAkhir': idGuruPencatat,
-  //     'namaGuruPencatatAkhir': namaGuruPencatat,
-  //     'lastEdited': FieldValue.serverTimestamp(),
-  //   }, SetOptions(merge: true));
-  // }
 
   void hitungNilaiAkhir() {
     if (bobotNilai.isEmpty) {

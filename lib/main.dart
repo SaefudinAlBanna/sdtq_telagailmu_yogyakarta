@@ -13,7 +13,7 @@ import 'app/controllers/storage_controller.dart';
 import 'app/controllers/auth_controller.dart';
 import 'app/controllers/config_controller.dart';
 import 'app/controllers/dashboard_controller.dart';
-import 'app/modules/profile/controllers/profile_controller.dart'; // Pastikan terimport jika permanent
+import 'app/modules/profile/controllers/profile_controller.dart';
 
 import 'app/routes/app_pages.dart';
 import 'firebase_options.dart';
@@ -46,7 +46,7 @@ Future<void> main() async {
   Get.put(AuthController(), permanent: true);
   Get.put(StorageController(), permanent: true);
   Get.put(ConfigController(), permanent: true);
-  Get.put(DashboardController(), permanent: true); 
+  Get.put(DashboardController(), permanent: true);
   Get.put(ProfileController(), permanent: true);
 
 

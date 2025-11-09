@@ -27,8 +27,6 @@ import '../modules/create_edit_ekskul/bindings/create_edit_ekskul_binding.dart';
 import '../modules/create_edit_ekskul/views/create_edit_ekskul_view.dart';
 import '../modules/create_edit_halaqah_group/bindings/create_edit_halaqah_group_binding.dart';
 import '../modules/create_edit_halaqah_group/views/create_edit_halaqah_group_view.dart';
-// import '../modules/create_edit_halaqah_ummi_group/bindings/create_edit_halaqah_ummi_group_binding.dart';
-// import '../modules/create_edit_halaqah_ummi_group/views/create_edit_halaqah_ummi_group_view.dart';
 import '../modules/daftar_nilai/bindings/daftar_nilai_binding.dart';
 import '../modules/daftar_nilai/views/daftar_nilai_view.dart';
 import '../modules/daftar_siswa/bindings/daftar_siswa_binding.dart';
@@ -55,12 +53,8 @@ import '../modules/forgot_password/bindings/forgot_password_binding.dart';
 import '../modules/forgot_password/views/forgot_password_view.dart';
 import '../modules/guru_akademik/bindings/guru_akademik_binding.dart';
 import '../modules/guru_akademik/views/guru_akademik_view.dart';
-// import '../modules/halaqah-ummi-dashboard-pengampu/bindings/halaqah_ummi_dashboard_pengampu_binding.dart';
-// import '../modules/halaqah-ummi-dashboard-pengampu/views/halaqah_ummi_dashboard_pengampu_view.dart';
-// import '../modules/halaqah-ummi-grading/bindings/halaqah_ummi_grading_binding.dart';
-// import '../modules/halaqah-ummi-grading/views/halaqah_ummi_grading_view.dart';
-// import '../modules/halaqah-ummi-riwayat-pengampu/bindings/halaqah_ummi_riwayat_pengampu_binding.dart';
-// import '../modules/halaqah-ummi-riwayat-pengampu/views/halaqah_ummi_riwayat_pengampu_view.dart';
+import '../modules/halaqah_dashboard/bindings/halaqah_dashboard_binding.dart';
+import '../modules/halaqah_dashboard/views/halaqah_dashboard_view.dart';
 import '../modules/halaqah_dashboard_pengampu/bindings/halaqah_dashboard_pengampu_binding.dart';
 import '../modules/halaqah_dashboard_pengampu/views/halaqah_dashboard_pengampu_view.dart';
 import '../modules/halaqah_grading/bindings/halaqah_grading_binding.dart';
@@ -73,18 +67,6 @@ import '../modules/halaqah_set_pengganti/bindings/halaqah_set_pengganti_binding.
 import '../modules/halaqah_set_pengganti/views/halaqah_set_pengganti_view.dart';
 import '../modules/halaqah_setoran_siswa/bindings/halaqah_setoran_siswa_binding.dart';
 import '../modules/halaqah_setoran_siswa/views/halaqah_setoran_siswa_view.dart';
-// import '../modules/halaqah_ummi_dashboard_koordinator/bindings/halaqah_ummi_dashboard_koordinator_binding.dart';
-// import '../modules/halaqah_ummi_dashboard_koordinator/views/halaqah_ummi_dashboard_koordinator_view.dart';
-// import '../modules/halaqah_ummi_grading_massal/bindings/halaqah_ummi_grading_massal_binding.dart';
-// import '../modules/halaqah_ummi_grading_massal/views/halaqah_ummi_grading_massal_view.dart';
-// import '../modules/halaqah_ummi_jadwal_penguji/bindings/halaqah_ummi_jadwal_penguji_binding.dart';
-// import '../modules/halaqah_ummi_jadwal_penguji/views/halaqah_ummi_jadwal_penguji_view.dart';
-// import '../modules/halaqah_ummi_management/bindings/halaqah_ummi_management_binding.dart';
-// import '../modules/halaqah_ummi_management/views/halaqah_ummi_management_view.dart';
-// import '../modules/halaqah_ummi_manajemen_penguji/bindings/halaqah_ummi_manajemen_penguji_binding.dart';
-// import '../modules/halaqah_ummi_manajemen_penguji/views/halaqah_ummi_manajemen_penguji_view.dart';
-// import '../modules/halaqah_ummi_set_pengganti/bindings/halaqah_ummi_set_pengganti_binding.dart';
-// import '../modules/halaqah_ummi_set_pengganti/views/halaqah_ummi_set_pengganti_view.dart';
 import '../modules/home/bindings/home_binding.dart';
 import '../modules/home/views/home_view.dart';
 import '../modules/import_pegawai/bindings/import_pegawai_binding.dart';
@@ -103,6 +85,8 @@ import '../modules/input_nilai_siswa/bindings/input_nilai_siswa_binding.dart';
 import '../modules/input_nilai_siswa/views/input_nilai_siswa_view.dart';
 import '../modules/jadwal_pelajaran/bindings/jadwal_pelajaran_binding.dart';
 import '../modules/jadwal_pelajaran/views/jadwal_pelajaran_view.dart';
+import '../modules/jadwal_ujian_penguji/bindings/jadwal_ujian_penguji_binding.dart';
+import '../modules/jadwal_ujian_penguji/views/jadwal_ujian_penguji_view.dart';
 import '../modules/jurnal_harian_guru/bindings/jurnal_harian_guru_binding.dart';
 import '../modules/jurnal_harian_guru/views/jurnal_harian_guru_view.dart';
 import '../modules/kelompok_halaqoh/bindings/kelompok_halaqoh_binding.dart';
@@ -139,8 +123,12 @@ import '../modules/manajemen_penawaran_buku/bindings/manajemen_penawaran_buku_bi
 import '../modules/manajemen_penawaran_buku/views/manajemen_penawaran_buku_view.dart';
 import '../modules/manajemen_pendaftaran_buku/bindings/manajemen_pendaftaran_buku_binding.dart';
 import '../modules/manajemen_pendaftaran_buku/views/manajemen_pendaftaran_buku_view.dart';
+import '../modules/manajemen_penguji/bindings/manajemen_penguji_binding.dart';
+import '../modules/manajemen_penguji/views/manajemen_penguji_view.dart';
 import '../modules/manajemen_peran/bindings/manajemen_peran_binding.dart';
 import '../modules/manajemen_peran/views/manajemen_peran_view.dart';
+import '../modules/manajemen_tingkatan_siswa/bindings/manajemen_tingkatan_siswa_binding.dart';
+import '../modules/manajemen_tingkatan_siswa/views/manajemen_tingkatan_siswa_view.dart';
 import '../modules/manajemen_tugas/bindings/manajemen_tugas_binding.dart';
 import '../modules/manajemen_tugas/views/manajemen_tugas_view.dart';
 import '../modules/manajemen_tunggakan_awal/bindings/manajemen_tunggakan_awal_binding.dart';
@@ -171,12 +159,12 @@ import '../modules/pengaturan_biaya/bindings/pengaturan_biaya_binding.dart';
 import '../modules/pengaturan_biaya/views/pengaturan_biaya_view.dart';
 import '../modules/pengaturan_bobot_nilai/bindings/pengaturan_bobot_nilai_binding.dart';
 import '../modules/pengaturan_bobot_nilai/views/pengaturan_bobot_nilai_view.dart';
+import '../modules/penjadwalan_ujian/bindings/penjadwalan_ujian_binding.dart';
+import '../modules/penjadwalan_ujian/views/penjadwalan_ujian_view.dart';
 import '../modules/penugasan_guru/bindings/penugasan_guru_binding.dart';
 import '../modules/penugasan_guru/views/penugasan_guru_view.dart';
 import '../modules/perangkat_ajar/bindings/perangkat_ajar_binding.dart';
 import '../modules/perangkat_ajar/views/perangkat_ajar_view.dart';
-// import '../modules/pindah_siswa_halaqah/bindings/pindah_siswa_halaqah_binding.dart';
-// import '../modules/pindah_siswa_halaqah/views/pindah_siswa_halaqah_view.dart';
 import '../modules/printer_settings/bindings/printer_settings_binding.dart';
 import '../modules/printer_settings/views/printer_settings_view.dart';
 import '../modules/profile/bindings/profile_binding.dart';
@@ -205,6 +193,29 @@ import '../modules/upsert_pegawai/bindings/upsert_pegawai_binding.dart';
 import '../modules/upsert_pegawai/views/upsert_pegawai_view.dart';
 import '../modules/upsert_siswa/bindings/upsert_siswa_binding.dart';
 import '../modules/upsert_siswa/views/upsert_siswa_view.dart';
+
+// import '../modules/create_edit_halaqah_ummi_group/bindings/create_edit_halaqah_ummi_group_binding.dart';
+// import '../modules/create_edit_halaqah_ummi_group/views/create_edit_halaqah_ummi_group_view.dart';
+// import '../modules/halaqah-ummi-dashboard-pengampu/bindings/halaqah_ummi_dashboard_pengampu_binding.dart';
+// import '../modules/halaqah-ummi-dashboard-pengampu/views/halaqah_ummi_dashboard_pengampu_view.dart';
+// import '../modules/halaqah-ummi-grading/bindings/halaqah_ummi_grading_binding.dart';
+// import '../modules/halaqah-ummi-grading/views/halaqah_ummi_grading_view.dart';
+// import '../modules/halaqah-ummi-riwayat-pengampu/bindings/halaqah_ummi_riwayat_pengampu_binding.dart';
+// import '../modules/halaqah-ummi-riwayat-pengampu/views/halaqah_ummi_riwayat_pengampu_view.dart';
+// import '../modules/halaqah_ummi_dashboard_koordinator/bindings/halaqah_ummi_dashboard_koordinator_binding.dart';
+// import '../modules/halaqah_ummi_dashboard_koordinator/views/halaqah_ummi_dashboard_koordinator_view.dart';
+// import '../modules/halaqah_ummi_grading_massal/bindings/halaqah_ummi_grading_massal_binding.dart';
+// import '../modules/halaqah_ummi_grading_massal/views/halaqah_ummi_grading_massal_view.dart';
+// import '../modules/halaqah_ummi_jadwal_penguji/bindings/halaqah_ummi_jadwal_penguji_binding.dart';
+// import '../modules/halaqah_ummi_jadwal_penguji/views/halaqah_ummi_jadwal_penguji_view.dart';
+// import '../modules/halaqah_ummi_management/bindings/halaqah_ummi_management_binding.dart';
+// import '../modules/halaqah_ummi_management/views/halaqah_ummi_management_view.dart';
+// import '../modules/halaqah_ummi_manajemen_penguji/bindings/halaqah_ummi_manajemen_penguji_binding.dart';
+// import '../modules/halaqah_ummi_manajemen_penguji/views/halaqah_ummi_manajemen_penguji_view.dart';
+// import '../modules/halaqah_ummi_set_pengganti/bindings/halaqah_ummi_set_pengganti_binding.dart';
+// import '../modules/halaqah_ummi_set_pengganti/views/halaqah_ummi_set_pengganti_view.dart';
+// import '../modules/pindah_siswa_halaqah/bindings/pindah_siswa_halaqah_binding.dart';
+// import '../modules/pindah_siswa_halaqah/views/pindah_siswa_halaqah_view.dart';
 
 part 'app_routes.dart';
 
@@ -674,6 +685,31 @@ class AppPages {
       name: _Paths.MANAJEMEN_ANGGARAN,
       page: () => const ManajemenAnggaranView(),
       binding: ManajemenAnggaranBinding(),
+    ),
+    GetPage(
+      name: _Paths.HALAQAH_DASHBOARD,
+      page: () => const HalaqahDashboardView(),
+      binding: HalaqahDashboardBinding(),
+    ),
+    GetPage(
+      name: _Paths.MANAJEMEN_PENGUJI,
+      page: () => const ManajemenPengujiView(),
+      binding: ManajemenPengujiBinding(),
+    ),
+    GetPage(
+      name: _Paths.PENJADWALAN_UJIAN,
+      page: () => const PenjadwalanUjianView(),
+      binding: PenjadwalanUjianBinding(),
+    ),
+    GetPage(
+      name: _Paths.MANAJEMEN_TINGKATAN_SISWA,
+      page: () => const ManajemenTingkatanSiswaView(),
+      binding: ManajemenTingkatanSiswaBinding(),
+    ),
+    GetPage(
+      name: _Paths.JADWAL_UJIAN_PENGUJI,
+      page: () => const JadwalUjianPengujiView(),
+      binding: JadwalUjianPengujiBinding(),
     ),
   ];
 }
