@@ -194,29 +194,6 @@ import '../modules/upsert_pegawai/views/upsert_pegawai_view.dart';
 import '../modules/upsert_siswa/bindings/upsert_siswa_binding.dart';
 import '../modules/upsert_siswa/views/upsert_siswa_view.dart';
 
-// import '../modules/create_edit_halaqah_ummi_group/bindings/create_edit_halaqah_ummi_group_binding.dart';
-// import '../modules/create_edit_halaqah_ummi_group/views/create_edit_halaqah_ummi_group_view.dart';
-// import '../modules/halaqah-ummi-dashboard-pengampu/bindings/halaqah_ummi_dashboard_pengampu_binding.dart';
-// import '../modules/halaqah-ummi-dashboard-pengampu/views/halaqah_ummi_dashboard_pengampu_view.dart';
-// import '../modules/halaqah-ummi-grading/bindings/halaqah_ummi_grading_binding.dart';
-// import '../modules/halaqah-ummi-grading/views/halaqah_ummi_grading_view.dart';
-// import '../modules/halaqah-ummi-riwayat-pengampu/bindings/halaqah_ummi_riwayat_pengampu_binding.dart';
-// import '../modules/halaqah-ummi-riwayat-pengampu/views/halaqah_ummi_riwayat_pengampu_view.dart';
-// import '../modules/halaqah_ummi_dashboard_koordinator/bindings/halaqah_ummi_dashboard_koordinator_binding.dart';
-// import '../modules/halaqah_ummi_dashboard_koordinator/views/halaqah_ummi_dashboard_koordinator_view.dart';
-// import '../modules/halaqah_ummi_grading_massal/bindings/halaqah_ummi_grading_massal_binding.dart';
-// import '../modules/halaqah_ummi_grading_massal/views/halaqah_ummi_grading_massal_view.dart';
-// import '../modules/halaqah_ummi_jadwal_penguji/bindings/halaqah_ummi_jadwal_penguji_binding.dart';
-// import '../modules/halaqah_ummi_jadwal_penguji/views/halaqah_ummi_jadwal_penguji_view.dart';
-// import '../modules/halaqah_ummi_management/bindings/halaqah_ummi_management_binding.dart';
-// import '../modules/halaqah_ummi_management/views/halaqah_ummi_management_view.dart';
-// import '../modules/halaqah_ummi_manajemen_penguji/bindings/halaqah_ummi_manajemen_penguji_binding.dart';
-// import '../modules/halaqah_ummi_manajemen_penguji/views/halaqah_ummi_manajemen_penguji_view.dart';
-// import '../modules/halaqah_ummi_set_pengganti/bindings/halaqah_ummi_set_pengganti_binding.dart';
-// import '../modules/halaqah_ummi_set_pengganti/views/halaqah_ummi_set_pengganti_view.dart';
-// import '../modules/pindah_siswa_halaqah/bindings/pindah_siswa_halaqah_binding.dart';
-// import '../modules/pindah_siswa_halaqah/views/pindah_siswa_halaqah_view.dart';
-
 part 'app_routes.dart';
 
 class AppPages {

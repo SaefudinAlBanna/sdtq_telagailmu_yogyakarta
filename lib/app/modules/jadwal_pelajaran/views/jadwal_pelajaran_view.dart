@@ -17,7 +17,7 @@ class JadwalPelajaranView extends GetView<JadwalPelajaranController> {
         elevation: 0,
         backgroundColor: Colors.grey.shade300,
         actions: [
-          if (controller.dashC.isPimpinan)
+          if (controller.dashC.isPimpinan || controller.dashC.canManageKbm)
           PopupMenuButton<String>(
             icon: const Icon(Icons.menu),
             tooltip: "Editor Jadwal",

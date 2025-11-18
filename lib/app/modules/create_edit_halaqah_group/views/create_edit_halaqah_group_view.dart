@@ -13,9 +13,8 @@ class CreateEditHalaqahGroupView extends GetView<CreateEditHalaqahGroupControlle
 
   @override
   Widget build(BuildContext context) {
-    // [FIX] Mengembalikan DefaultTabController sebagai parent dari Scaffold
     return DefaultTabController(
-      length: 2, // Jumlah tab kita
+      length: 2,
       child: Scaffold(
         appBar: AppBar(
           title: Text(controller.isEditMode.value ? 'Edit Grup Halaqah' : 'Buat Grup Halaqah'),
@@ -34,18 +33,13 @@ class CreateEditHalaqahGroupView extends GetView<CreateEditHalaqahGroupControlle
           }
           return Column(
             children: [
-              // Bagian form diletakkan di atas tab
               _buildFormSection(),
-              
-              // TabBar harus berada di dalam Column, di atas TabBarView
               const TabBar(
                 tabs: [
                   Tab(text: "Anggota Grup"),
                   Tab(text: "Siswa Tersedia"),
                 ],
               ),
-              
-              // Expanded memastikan TabBarView mengisi sisa ruang
               Expanded(
                 child: TabBarView(
                   children: [
@@ -81,7 +75,18 @@ class CreateEditHalaqahGroupView extends GetView<CreateEditHalaqahGroupControlle
                     decoration: InputDecoration(hintText: "Cari nama pengampu..."),
                   ),
                 ),
-                itemAsString: (PegawaiSimpleModel p) => "${p.nama} (${p.alias})",
+
+                // [PERBAIKAN KUNCI] Logika tampilan dibuat lebih kuat
+                itemAsString: (PegawaiSimpleModel p) {
+                  // Cek dulu apakah alias memiliki nilai yang valid (tidak null dan tidak kosong)
+                  if (p.alias.isNotEmpty) {
+                    // Jika ada, tampilkan format lengkap "Nama (Alias)"
+                    return "${p.nama} (${p.alias})";
+                  }
+                  // Jika tidak ada alias, HANYA tampilkan nama untuk menghindari "Nama ()"
+                  return p.nama;
+                },
+
                 compareFn: (item1, item2) => item1.uid == item2.uid,
                 selectedItem: controller.selectedPengampu.value,
                 onChanged: (value) {

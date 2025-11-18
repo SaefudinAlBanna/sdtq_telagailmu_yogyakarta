@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sdtq_telagailmu_yogyakarta/app/models/siswa_simple_model.dart';
 
+import '../../../widgets/avatar_pengampu.dart'; 
 import '../../../utils/halaqah_utils.dart';
 import '../controllers/halaqah_grading_controller.dart';
 
@@ -79,10 +80,15 @@ class HalaqahGradingView extends GetView<HalaqahGradingController> {
                   child: ListTile(
                     contentPadding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
                     onTap: () => controller.goToRiwayatSiswa(anggota),
-                    leading: CircleAvatar(
-                      radius: 25,
-                      // [FIX 4 & 5] Mengganti 'urutan' dengan logika inisial nama yang sudah ada
-                      child: Text(anggota.nama.isNotEmpty ? anggota.nama[0].toUpperCase() : '-'),
+                    // leading: CircleAvatar(
+                    //   radius: 25,
+                    //   // [FIX 4 & 5] Mengganti 'urutan' dengan logika inisial nama yang sudah ada
+                    //   child: Text(anggota.nama.isNotEmpty ? anggota.nama[0].toUpperCase() : '-'),
+                    // ),
+                    leading: AvatarPengampu(
+                      // [DIUBAH] Gunakan widget kustom
+                      imageUrl: anggota.profileImageUrl, 
+                      nama: anggota.nama,
                     ),
                     title: Text(anggota.nama, style: const TextStyle(fontWeight: FontWeight.bold)),
                       subtitle: Column(

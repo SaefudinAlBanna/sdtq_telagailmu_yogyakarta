@@ -60,22 +60,95 @@ class HalaqahGradingController extends GetxController {
         'pengampuUtama': {
           'id': group.idPengampu,
           'nama': group.namaPengampu,
+          'alias': group.aliasPengampu,
         }
       },
     );
   }
 
+  // Future<List<AnggotaGrupDetail>> fetchAnggota() async {
+  //   final tahunAjaran = configC.tahunAjaranAktif.value;
+
+  //   final groupRef = _firestore.collection('Sekolah').doc(configC.idSekolah)
+  //       .collection('tahunajaran').doc(tahunAjaran)
+  //       .collection('halaqah_grup').doc(group.id);
+    
+  //   final ujianRef = _firestore.collection('Sekolah').doc(configC.idSekolah)
+  //       .collection('tahunajaran').doc(tahunAjaran)
+  //       .collection('halaqah_ujian');
+
+  //   final results = await Future.wait([
+  //     groupRef.collection('anggota').get(),
+  //     groupRef.get(),
+  //     ujianRef.where('idGrup', isEqualTo: group.id).get(),
+  //   ]);
+
+  //   final anggotaSnapshot = results[0] as QuerySnapshot;
+  //   final groupSnapshot = results[1] as DocumentSnapshot;
+  //   final ujianSnapshot = results[2] as QuerySnapshot;
+
+  //   final dataAntrian = (groupSnapshot.data() as Map<String, dynamic>?)?['antrianSetoran'] as Map<String, dynamic>? ?? {};
+  //   antrianMap.clear();
+  //   dataAntrian.forEach((uid, data) {
+  //     antrianMap[uid] = data['waktu'] as Timestamp;
+  //   });
+
+  //   siswaUjianStatusMap.clear();
+  //   for (var doc in ujianSnapshot.docs) {
+  //     // [FIX 1 & 2] Casting doc.data() menjadi Map<String, dynamic>
+  //     final data = doc.data() as Map<String, dynamic>?; 
+
+  //     final status = data?['status'] as String?;
+  //     final uidSiswa = data?['uidSiswa'] as String?;
+
+  //     if (uidSiswa != null && (status == 'diajukan' || status == 'dijadwalkan')) {
+  //       siswaUjianStatusMap[uidSiswa] = status!;
+  //     }
+  //   }
+
+  //   final semuaSiswaSnapshot = await _firestore.collection('Sekolah').doc(configC.idSekolah)
+  //     .collection('siswa').get();
+      
+  //   final Map<String, Map<String, dynamic>> semuaSiswaDataMap = {
+  //     for (var doc in semuaSiswaSnapshot.docs) doc.id: doc.data()
+  //   };
+
+  //   // Buat Map UID anggota untuk pencarian cepat
+  //   final Set<String> anggotaUids = anggotaSnapshot.docs.map((doc) => doc.id).toSet();
+
+  //   List<AnggotaGrupDetail> listAnggotaDetail = [];
+
+  //   // Filter dan gabungkan data di sisi klien
+  //   for (String uid in anggotaUids) {
+  //     if (semuaSiswaDataMap.containsKey(uid)) {
+  //       final dataSiswa = semuaSiswaDataMap[uid]!;
+  //       // Ambil nama dari data anggota asli untuk konsistensi
+  //       final namaSiswaDiGrup = (anggotaSnapshot.docs.firstWhere((doc) => doc.id == uid).data() as Map)['namaSiswa'];
+
+  //       listAnggotaDetail.add(
+  //         AnggotaGrupDetail(
+  //           siswa: SiswaSimpleModel(
+  //             uid: uid,
+  //             nama: namaSiswaDiGrup ?? 'Tanpa Nama',
+  //             kelasId: (dataSiswa['kelasId'] as String?) ?? 'N/A',
+  //           ),
+  //           tingkatan: dataSiswa['halaqahTingkatan'] as Map<String, dynamic>?,
+  //         )
+  //       );
+  //     }
+  //   }
+  //   return listAnggotaDetail;
+  // }
+
   Future<List<AnggotaGrupDetail>> fetchAnggota() async {
     final tahunAjaran = configC.tahunAjaranAktif.value;
-
-    final groupRef = _firestore.collection('Sekolah').doc(configC.idSekolah)
-        .collection('tahunajaran').doc(tahunAjaran)
-        .collection('halaqah_grup').doc(group.id);
+    final sekolahRef = _firestore.collection('Sekolah').doc(configC.idSekolah);
+    final tahunAjaranRef = sekolahRef.collection('tahunajaran').doc(tahunAjaran);
     
-    final ujianRef = _firestore.collection('Sekolah').doc(configC.idSekolah)
-        .collection('tahunajaran').doc(tahunAjaran)
-        .collection('halaqah_ujian');
+    final groupRef = tahunAjaranRef.collection('halaqah_grup').doc(group.id);
+    final ujianRef = tahunAjaranRef.collection('halaqah_ujian');
 
+    // --- Tahap 1: Ambil data grup, anggota (hanya UID), dan data ujian secara paralel ---
     final results = await Future.wait([
       groupRef.collection('anggota').get(),
       groupRef.get(),
@@ -86,6 +159,7 @@ class HalaqahGradingController extends GetxController {
     final groupSnapshot = results[1] as DocumentSnapshot;
     final ujianSnapshot = results[2] as QuerySnapshot;
 
+    // --- Proses data grup dan ujian (tidak ada perubahan di sini) ---
     final dataAntrian = (groupSnapshot.data() as Map<String, dynamic>?)?['antrianSetoran'] as Map<String, dynamic>? ?? {};
     antrianMap.clear();
     dataAntrian.forEach((uid, data) {
@@ -94,35 +168,64 @@ class HalaqahGradingController extends GetxController {
 
     siswaUjianStatusMap.clear();
     for (var doc in ujianSnapshot.docs) {
-      // [FIX 1 & 2] Casting doc.data() menjadi Map<String, dynamic>
       final data = doc.data() as Map<String, dynamic>?; 
-
       final status = data?['status'] as String?;
       final uidSiswa = data?['uidSiswa'] as String?;
-
       if (uidSiswa != null && (status == 'diajukan' || status == 'dijadwalkan')) {
         siswaUjianStatusMap[uidSiswa] = status!;
       }
     }
 
-    final semuaSiswaSnapshot = await _firestore.collection('Sekolah').doc(configC.idSekolah)
-      .collection('siswa').get();
-      
-    final Map<String, Map<String, dynamic>> semuaSiswaDataMap = {
-      for (var doc in semuaSiswaSnapshot.docs) doc.id: doc.data()
-    };
+    // --- [STRATEGI BARU] - Mengambil data siswa secara efisien ---
 
-    // Buat Map UID anggota untuk pencarian cepat
-    final Set<String> anggotaUids = anggotaSnapshot.docs.map((doc) => doc.id).toSet();
+    // 1. Kumpulkan semua UID anggota dari snapshot
+    final List<String> anggotaUids = anggotaSnapshot.docs.map((doc) => doc.id).toList();
 
+    // Jika tidak ada anggota, langsung selesaikan misi.
+    if (anggotaUids.isEmpty) {
+      return [];
+    }
+
+    // 2. Pecah daftar UID menjadi beberapa bagian (chunk) @ 30 UID per bagian
+    // Ini untuk menghindari limit query 'whereIn' dari Firestore.
+    const chunkSize = 30;
+    List<List<String>> uidChunks = [];
+    for (var i = 0; i < anggotaUids.length; i += chunkSize) {
+      uidChunks.add(
+        anggotaUids.sublist(i, i + chunkSize > anggotaUids.length ? anggotaUids.length : i + chunkSize)
+      );
+    }
+
+    // 3. Buat dan jalankan query untuk setiap 'chunk' secara paralel
+    List<Future<QuerySnapshot>> futures = [];
+    final siswaCollectionRef = sekolahRef.collection('siswa');
+
+    for (final chunk in uidChunks) {
+      futures.add(
+        siswaCollectionRef.where(FieldPath.documentId, whereIn: chunk).get()
+      );
+    }
+    
+    // Tunggu semua query 'chunk' selesai
+    final List<QuerySnapshot> semuaSiswaSnapshots = await Future.wait(futures);
+
+    // 4. Gabungkan hasil dari semua 'chunk' ke dalam satu map untuk pencarian cepat
+    final Map<String, Map<String, dynamic>> semuaSiswaDataMap = {};
+    for (final snapshot in semuaSiswaSnapshots) {
+      for (final doc in snapshot.docs) {
+        semuaSiswaDataMap[doc.id] = doc.data() as Map<String, dynamic>;
+      }
+    }
+
+    // --- [STRATEGI LAMA DILANJUTKAN] - Dengan data yang sudah diambil secara efisien ---
     List<AnggotaGrupDetail> listAnggotaDetail = [];
 
-    // Filter dan gabungkan data di sisi klien
-    for (String uid in anggotaUids) {
+    // Gunakan 'anggotaSnapshot' untuk memastikan data nama sesuai dengan yang ada di grup
+    for (var anggotaDoc in anggotaSnapshot.docs) {
+      final uid = anggotaDoc.id;
       if (semuaSiswaDataMap.containsKey(uid)) {
         final dataSiswa = semuaSiswaDataMap[uid]!;
-        // Ambil nama dari data anggota asli untuk konsistensi
-        final namaSiswaDiGrup = (anggotaSnapshot.docs.firstWhere((doc) => doc.id == uid).data() as Map)['namaSiswa'];
+        final namaSiswaDiGrup = (anggotaDoc.data() as Map)['namaSiswa'];
 
         listAnggotaDetail.add(
           AnggotaGrupDetail(
@@ -130,12 +233,15 @@ class HalaqahGradingController extends GetxController {
               uid: uid,
               nama: namaSiswaDiGrup ?? 'Tanpa Nama',
               kelasId: (dataSiswa['kelasId'] as String?) ?? 'N/A',
+              // [PERBAIKAN KUNCI] Teruskan URL gambar dari data siswa yang sudah kita ambil.
+              profileImageUrl: dataSiswa['fotoProfilUrl'] as String?,
             ),
             tingkatan: dataSiswa['halaqahTingkatan'] as Map<String, dynamic>?,
           )
         );
       }
     }
+    
     return listAnggotaDetail;
   }
 

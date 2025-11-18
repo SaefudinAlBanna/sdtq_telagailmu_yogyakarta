@@ -58,6 +58,30 @@ class DaftarSiswaPermapelController extends GetxController {
     super.onClose();
   }
 
+  // Future<void> _fetchDaftarSiswa() async {
+  //   isLoading.value = true;
+  //   try {
+  //     final String tahunAjaran = configC.tahunAjaranAktif.value;
+  //     if (tahunAjaran.isEmpty || tahunAjaran.contains("TIDAK")) {
+  //       throw Exception("Tahun ajaran aktif tidak valid.");
+  //     }
+  //     final snapshot = await _firestore
+  //         .collection('Sekolah').doc(configC.idSekolah)
+  //         .collection('tahunajaran').doc(tahunAjaran)
+  //         .collection('kelastahunajaran').doc(idKelas)
+  //         .collection('daftarsiswa').orderBy('namaLengkap').get();
+  //     final allSiswa = snapshot.docs.map((doc) => 
+  //         SiswaModel.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>))
+  //         .toList();
+  //     daftarSiswa.assignAll(allSiswa);
+  //   } catch (e) {
+  //     Get.snackbar("Error", "Gagal memuat daftar siswa: ${e.toString()}");
+  //     print("[DaftarSiswaPermapelController] Error fetching students: $e");
+  //   } finally {
+  //     isLoading.value = false;
+  //   }
+  // }
+
   Future<void> _fetchDaftarSiswa() async {
     isLoading.value = true;
     try {
@@ -65,15 +89,63 @@ class DaftarSiswaPermapelController extends GetxController {
       if (tahunAjaran.isEmpty || tahunAjaran.contains("TIDAK")) {
         throw Exception("Tahun ajaran aktif tidak valid.");
       }
-      final snapshot = await _firestore
+
+      // Langkah 1: Ambil daftar siswa (roster) dari sub-koleksi kelas.
+      final rosterSnapshot = await _firestore
           .collection('Sekolah').doc(configC.idSekolah)
           .collection('tahunajaran').doc(tahunAjaran)
           .collection('kelastahunajaran').doc(idKelas)
-          .collection('daftarsiswa').orderBy('namaLengkap').get();
-      final allSiswa = snapshot.docs.map((doc) => 
-          SiswaModel.fromFirestore(doc as DocumentSnapshot<Map<String, dynamic>>))
-          .toList();
-      daftarSiswa.assignAll(allSiswa);
+          .collection('daftarsiswa').get();
+
+      if (rosterSnapshot.docs.isEmpty) {
+        daftarSiswa.clear();
+        isLoading.value = false;
+        return;
+      }
+
+      final siswaUids = rosterSnapshot.docs.map((doc) => doc.id).toList();
+
+      // --- [PERBAIKAN ANTI-CRASH] Pecah UID menjadi beberapa bagian (chunk) @ 30 ---
+      const chunkSize = 30;
+      List<List<String>> uidChunks = [];
+      for (var i = 0; i < siswaUids.length; i += chunkSize) {
+        uidChunks.add(
+          siswaUids.sublist(i, i + chunkSize > siswaUids.length ? siswaUids.length : i + chunkSize)
+        );
+      }
+
+      // Langkah 2: Ambil data profil LENGKAP secara paralel untuk setiap chunk.
+      List<Future<QuerySnapshot<Map<String, dynamic>>>> futures = [];
+      final siswaCollectionRef = _firestore.collection('Sekolah').doc(configC.idSekolah).collection('siswa');
+
+      for (final chunk in uidChunks) {
+        futures.add(
+          siswaCollectionRef.where(FieldPath.documentId, whereIn: chunk).get()
+        );
+      }
+      
+      final List<QuerySnapshot<Map<String, dynamic>>> allProfileSnapshots = await Future.wait(futures);
+
+      // Gabungkan semua hasil ke dalam satu Peta (Map) untuk pencarian cepat.
+      final Map<String, DocumentSnapshot<Map<String, dynamic>>> profileMap = {};
+      for (final snapshot in allProfileSnapshots) {
+        for (final doc in snapshot.docs) {
+          profileMap[doc.id] = doc;
+        }
+      }
+
+      // Langkah 3: Gabungkan data.
+      final List<SiswaModel> hydratedSiswaList = [];
+      for (final rosterDoc in rosterSnapshot.docs) {
+        if (profileMap.containsKey(rosterDoc.id)) {
+          final fullProfileDoc = profileMap[rosterDoc.id]!;
+          hydratedSiswaList.add(SiswaModel.fromFirestore(fullProfileDoc));
+        }
+      }
+      
+      hydratedSiswaList.sort((a, b) => a.namaLengkap.compareTo(b.namaLengkap));
+      daftarSiswa.assignAll(hydratedSiswaList);
+
     } catch (e) {
       Get.snackbar("Error", "Gagal memuat daftar siswa: ${e.toString()}");
       print("[DaftarSiswaPermapelController] Error fetching students: $e");

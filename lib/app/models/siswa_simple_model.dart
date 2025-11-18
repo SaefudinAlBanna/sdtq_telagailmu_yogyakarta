@@ -5,8 +5,9 @@ class SiswaSimpleModel {
   final String uid;
   final String nama;
   final String kelasId;
+  final String? profileImageUrl;
 
-  SiswaSimpleModel({required this.uid, required this.nama, required this.kelasId});
+  SiswaSimpleModel({required this.uid, required this.nama, required this.kelasId, this.profileImageUrl,});
 
   factory SiswaSimpleModel.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
@@ -14,6 +15,7 @@ class SiswaSimpleModel {
       uid: doc.id,
       nama: data['namaLengkap'] ?? data['namasiswa'] ?? 'Tanpa Nama', 
       kelasId: data['kelasId'] ?? 'N/A',
+      profileImageUrl: data['fotoProfilUrl'], 
     );
   }
 }

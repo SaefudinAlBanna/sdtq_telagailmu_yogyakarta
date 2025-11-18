@@ -99,7 +99,9 @@ class DashboardController extends GetxController {
     if (user.isEmpty) return false;
     final String peranSistem = user['peranSistem'] ?? '';
     final String role = user['role'] ?? '';
-    return ['Kepala Sekolah', 'Koordinator Kurikulum'].contains(role) || peranSistem == 'superadmin';
+    final List<String> tugas = List<String>.from(user['tugas'] ?? []);
+    final bool hasRequiredTugas = tugas.contains('Koordinator Kurikulum');
+    return ['Kepala Sekolah', 'Koordinator Kurikulum'].contains(role) || peranSistem == 'superadmin' || hasRequiredTugas;
   }
 
   bool get canManageKomite {

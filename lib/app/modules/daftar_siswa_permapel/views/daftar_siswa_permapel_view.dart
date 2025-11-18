@@ -1,7 +1,7 @@
-// lib/app/modules/daftar_siswa_permapel/views/daftar_siswa_permapel_view.dart (SUDAH DIINTEGRASIKAN)
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+// --- [LANGKAH 1] Tambahkan import untuk widget avatar kustom ---
+import '../../../widgets/avatar_pengampu.dart'; 
 import '../../../models/siswa_model.dart';
 import '../controllers/daftar_siswa_permapel_controller.dart';
 
@@ -26,7 +26,6 @@ class DaftarSiswaPermapelView extends GetView<DaftarSiswaPermapelController> {
             onPressed: () => controller.goToManajemenTugas(),
           ),
         Obx(() {
-            // Hanya tampilkan tombol ini jika pengguna adalah Wali Kelas
             if (controller.isWaliKelas.value) {
               return IconButton(
                 icon: const Icon(Icons.edit_document),
@@ -34,7 +33,7 @@ class DaftarSiswaPermapelView extends GetView<DaftarSiswaPermapelController> {
                 onPressed: controller.showCatatanRaporDialog,
               );
             }
-            return const SizedBox.shrink(); // Sembunyikan jika bukan Wali Kelas
+            return const SizedBox.shrink();
           }),
         ],
       ),
@@ -48,32 +47,37 @@ class DaftarSiswaPermapelView extends GetView<DaftarSiswaPermapelController> {
           itemBuilder: (context, index) {
             final siswa = controller.daftarSiswa[index];
             
-            // [MODIFIKASI KUNCI DI SINI]
-            // Kita akan membuat ListTile dengan trailing yang dinamis
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
               color: controller.isPengganti ? Colors.grey.shade100 : null,
               child: ListTile(
-                leading: CircleAvatar(child: Text(siswa.namaLengkap[0])),
+                // --- [LANGKAH 2: MODIFIKASI KUNCI DI SINI] ---
+                // Ganti CircleAvatar statis dengan widget AvatarPengampu dinamis.
+                leading: AvatarPengampu(
+                  imageUrl: siswa.fotoProfilUrl,
+                  nama: siswa.namaLengkap,
+                ),
+                // --- Akhir Modifikasi ---
                 title: Text(siswa.namaLengkap, style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text("NISN: ${siswa.nisn}"),
+                subtitle: Text("NISN: ${siswa.nisn ?? 'N/A'}"), // Tambahkan fallback jika nisn null
                 
-                // --- Logika Kondisional untuk Aksi ---
+                // onTap: controller.isPengganti ? null : () {
+                //   if (!controller.isWaliKelas.value) {
+                //     controller.goToInputNilaiSiswa(siswa);
+                //   }
+                // },
+                
                 onTap: controller.isPengganti ? null : () {
-                  // Jika BUKAN wali kelas, onTap langsung ke input nilai
-                  if (!controller.isWaliKelas.value) {
-                    controller.goToInputNilaiSiswa(siswa);
-                  }
-                  // Jika wali kelas, onTap tidak melakukan apa-apa karena aksi ada di menu
+                  // [MODIFIKASI] Sekarang, baik Wali Kelas maupun Guru Mapel biasa
+                  // akan diarahkan ke halaman input nilai saat menekan bagian tengah ListTile.
+                  controller.goToInputNilaiSiswa(siswa);
                 },
                 trailing: controller.isPengganti 
-                  ? null // Tidak ada aksi untuk guru pengganti
+                  ? null
                   : Obx(() {
-                      // Jika pengguna adalah WALI KELAS, tampilkan menu
                       if (controller.isWaliKelas.value) {
                         return _buildWaliKelasMenu(siswa);
                       }
-                      // Jika BUKAN wali kelas, tampilkan ikon panah biasa
                       return const Icon(Icons.chevron_right);
                     }),
               ),
@@ -84,7 +88,6 @@ class DaftarSiswaPermapelView extends GetView<DaftarSiswaPermapelController> {
     );
   }
 
-  // [BARU] Widget pembantu untuk membuat PopupMenuButton khusus Wali Kelas
   Widget _buildWaliKelasMenu(SiswaModel siswa) {
     return PopupMenuButton<String>(
       onSelected: (value) {
@@ -113,58 +116,3 @@ class DaftarSiswaPermapelView extends GetView<DaftarSiswaPermapelController> {
     );
   }
 }
-
-// // lib/app/modules/daftar_siswa_permapel/views/daftar_siswa_permapel_view.dart
-
-// import 'package:flutter/material.dart';
-// import 'package:get/get.dart';
-// import '../controllers/daftar_siswa_permapel_controller.dart';
-
-// class DaftarSiswaPermapelView extends GetView<DaftarSiswaPermapelController> {
-//   const DaftarSiswaPermapelView({Key? key}) : super(key: key);
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(
-//         title: Column(
-//           children: [
-//             Text(controller.namaMapel, style: const TextStyle(fontSize: 18)),
-//             Text(controller.idKelas, style: const TextStyle(fontSize: 14, color: Colors.grey)),
-//           ],
-//         ),
-//         centerTitle: true,
-//         actions: [
-//           // [PERBAIKAN UI/UX] Ganti PopupMenu dengan IconButton yang lebih jelas
-//           IconButton(
-//             icon: const Icon(Icons.assignment_turned_in_outlined),
-//             tooltip: "Manajemen Tugas & Penilaian",
-//             onPressed: () => controller.goToManajemenTugas(),
-//           ),
-//         ],
-//       ),
-//       body: Obx(() {
-//         if (controller.isLoading.value) return const Center(child: CircularProgressIndicator());
-//         if (controller.daftarSiswa.isEmpty) return const Center(child: Text("Belum ada siswa di kelas ini."));
-//         return ListView.builder(
-//           padding: const EdgeInsets.all(16),
-//           itemCount: controller.daftarSiswa.length,
-//           itemBuilder: (context, index) {
-//             final siswa = controller.daftarSiswa[index];
-//             return Card(
-//               margin: const EdgeInsets.only(bottom: 12),
-//               color: controller.isPengganti ? Colors.grey.shade100 : null,
-//               child: ListTile(
-//                 leading: CircleAvatar(child: Text(siswa.namaLengkap[0])),
-//                 title: Text(siswa.namaLengkap, style: const TextStyle(fontWeight: FontWeight.bold)),
-//                 subtitle: Text("NISN: ${siswa.nisn}"),
-//                 trailing: controller.isPengganti ? null : const Icon(Icons.chevron_right),
-//                 onTap: controller.isPengganti ? null : () => controller.goToInputNilaiSiswa(siswa),
-//               ),
-//             );
-//           },
-//         );
-//       }),
-//     );
-//   }
-// }

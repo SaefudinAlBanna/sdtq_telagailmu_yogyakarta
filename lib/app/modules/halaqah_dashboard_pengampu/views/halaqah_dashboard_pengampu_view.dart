@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sdtq_telagailmu_yogyakarta/app/models/halaqah_group_model.dart';
 
+import '../../../widgets/avatar_pengampu.dart';
 import '../../../routes/app_pages.dart';
 import '../controllers/halaqah_dashboard_pengampu_controller.dart';
 
@@ -56,13 +57,18 @@ class HalaqahDashboardPengampuView extends GetView<HalaqahDashboardPengampuContr
                   elevation: 2,
                   margin: const EdgeInsets.only(bottom: 12),
                   child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundImage: (group.profileImageUrl != null && group.profileImageUrl!.isNotEmpty)
-                        ? NetworkImage(group.profileImageUrl!)
-                        : null,
-                      child: (group.profileImageUrl == null || group.profileImageUrl!.isEmpty)
-                        ? Text(group.aliasPengampu)
-                        : null,
+                    // leading: CircleAvatar(
+                    //   backgroundImage: (group.profileImageUrl != null && group.profileImageUrl!.isNotEmpty)
+                    //     ? NetworkImage(group.profileImageUrl!)
+                    //     : null,
+                    //   child: (group.profileImageUrl == null || group.profileImageUrl!.isEmpty)
+                    //     ? Text(group.aliasPengampu)
+                    //     : null,
+                    // ),
+                    leading: AvatarPengampu(
+                      // [DIUBAH] Gunakan widget kustom agar konsisten
+                      imageUrl: group.profileImageUrl, 
+                      nama: group.namaPengampu, // Gunakan nama lengkap untuk inisial yang lebih baik
                     ),
                     title: Row(
                       children: [

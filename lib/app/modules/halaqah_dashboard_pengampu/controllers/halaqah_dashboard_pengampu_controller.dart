@@ -26,47 +26,47 @@ class HalaqahDashboardPengampuController extends GetxController {
   Future<List<HalaqahGroupModel>> fetchMyGroups() async {
     final uid = authC.auth.currentUser!.uid;
     final tahunAjaran = configC.tahunAjaranAktif.value;
-    final semester = configC.semesterAktif.value;
-    final keySemester = "${tahunAjaran}_$semester";
-    
+
+    // 1. Ambil data profil terbaru DIRI SENDIRI terlebih dahulu.
+    final myProfileDoc = await _firestore
+        .collection('Sekolah').doc(configC.idSekolah)
+        .collection('pegawai').doc(uid).get();
+    final myProfileImageUrl = myProfileDoc.data()?['profileImageUrl'] as String?;
+
+    // 2. Lanjutkan ambil data grup.
     final Map<String, HalaqahGroupModel> combinedGroups = {};
-  
-    // --- [SOLUSI BARU TANPA whereIn] ---
-    // 1. Ambil SEMUA grup di tahun ajaran aktif
-    final semuaGrupSnapshot = await _firestore
+    final queryGrup = _firestore
         .collection('Sekolah').doc(configC.idSekolah)
         .collection('tahunajaran').doc(tahunAjaran)
-        .collection('halaqah_grup')
-        .get();
+        .collection('halaqah_grup');
     
-    // 2. Ambil daftar ID grup permanen dari profil pengguna
-    final user = configC.infoUser;
-    final Map<String, dynamic> diampuData = user['grupHalaqahDiampu'] ?? {};
-    final List<String> permanentGroupIds = List<String>.from(diampuData[keySemester] ?? []);
-  
-    // 3. Filter di sisi klien
-    for (var doc in semuaGrupSnapshot.docs) {
-      if (permanentGroupIds.contains(doc.id)) {
-        combinedGroups[doc.id] = HalaqahGroupModel.fromFirestore(doc);
-      }
+    final results = await Future.wait([
+      queryGrup.where('idPengampu', isEqualTo: uid).get(),
+      queryGrup.where('penggantiHarian.${DateFormat('yyyy-MM-dd').format(DateTime.now())}.idPengganti', isEqualTo: uid).get()
+    ]);
+
+    final permanentSnapshot = results[0];
+    final substituteSnapshot = results[1];
+
+    // Proses grup permanen
+    for (var doc in permanentSnapshot.docs) {
+      // Buat objek awal dari Firestore
+      final groupFromFirestore = HalaqahGroupModel.fromFirestore(doc);
+      // Buat objek BARU yang sudah diperbarui menggunakan copyWith
+      final updatedGroup = groupFromFirestore.copyWith(profileImageUrl: myProfileImageUrl);
+      combinedGroups[doc.id] = updatedGroup;
     }
-    // --- AKHIR SOLUSI BARU ---
-  
-    // --- QUERY 2: Ambil grup pengganti (ini tetap efisien dan tidak perlu diubah) ---
-    final todayKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final substituteSnapshot = await _firestore
-        .collection('Sekolah').doc(configC.idSekolah)
-        .collection('tahunajaran').doc(tahunAjaran)
-        .collection('halaqah_grup')
-        .where('penggantiHarian.$todayKey.idPengganti', isEqualTo: uid)
-        .get();
-  
+    
+    // Proses grup pengganti
     for (var doc in substituteSnapshot.docs) {
-      final group = HalaqahGroupModel.fromFirestore(doc);
-      group.isPengganti = true;
-      combinedGroups[doc.id] = group;
+      final groupFromFirestore = HalaqahGroupModel.fromFirestore(doc);
+      final updatedGroup = groupFromFirestore.copyWith(
+        profileImageUrl: myProfileImageUrl,
+        isPengganti: true, // Kita juga bisa set properti lain
+      );
+      combinedGroups[doc.id] = updatedGroup;
     }
-  
+
     final finalGroupList = combinedGroups.values.toList();
     finalGroupList.sort((a, b) => a.namaGrup.compareTo(b.namaGrup));
     
