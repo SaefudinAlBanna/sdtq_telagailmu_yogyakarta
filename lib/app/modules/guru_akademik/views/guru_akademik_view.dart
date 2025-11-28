@@ -12,6 +12,13 @@ class GuruAkademikView extends GetView<GuruAkademikController> {
         title: const Text('Kelas & Mapel Saya'),
         centerTitle: true,
         // --- [PERBAIKAN] Pindahkan Aksi Wali Kelas ke Body untuk UI yang Lebih Bersih ---
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.library_books_outlined),
+            tooltip: 'Jurnal Harian',
+            onPressed: controller.goToJurnalHarian,
+          ),
+        ],
       ),
       body: Obx(() {
         if (controller.isLoading.value) {

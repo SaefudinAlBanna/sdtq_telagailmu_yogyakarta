@@ -71,20 +71,39 @@ class InfoSekolahController extends GetxController {
     Get.toNamed(Routes.INFO_SEKOLAH_FORM, arguments: info);
   }
 
-  Future<void> pickImage() async {
+  Future<void> pilihDanKompresGambarInfo() async {
+    // 1. Tampilkan loading agar pengguna tahu ada proses yang berjalan.
+    isFormLoading.value = true;
     try {
+      // 2. Panggil pemilih gambar dari galeri.
       final ImagePicker picker = ImagePicker();
-      // Ambil gambar dengan kualitas asli
-      final XFile? pickedFile = await picker.pickImage(source: ImageSource.gallery); 
-      if (pickedFile != null) {
-        imageFile.value = File(pickedFile.path);
-      }
-    } catch (e) { Get.snackbar('Error', 'Gagal memilih gambar: $e'); }
-  }
+      final XFile? pickedFile = await picker.pickImage(source: ImageSource.gallery);
 
-  void removeImage() {
-    imageFile.value = null;
-    existingImageUrl.value = ''; // Hapus juga gambar lama
+      // 3. Jika pengguna membatalkan, hentikan proses dan loading.
+      if (pickedFile == null) {
+        isFormLoading.value = false;
+        return;
+      }
+
+      // 4. Jika gambar berhasil dipilih, panggil fungsi kompresi.
+      // Kita menggunakan fungsi _compressImage yang sudah ada.
+      File? compressedResult = await _compressImage(File(pickedFile.path));
+
+      // 5. Jika kompresi berhasil, simpan hasilnya ke state untuk ditampilkan di UI.
+      if (compressedResult != null) {
+        imageFile.value = compressedResult;
+      } else {
+        // Jika kompresi gagal, beri tahu pengguna dan jangan set gambar.
+        Get.snackbar("Gagal", "Gagal memproses gambar. Silakan coba gambar lain.");
+        imageFile.value = null; // Pastikan state bersih
+      }
+
+    } catch (e) {
+      Get.snackbar('Error', 'Gagal memilih gambar: $e');
+    } finally {
+      // 6. Sembunyikan loading setelah semua proses selesai.
+      isFormLoading.value = false;
+    }
   }
 
   Future<File?> _compressImage(File file) async {
@@ -104,7 +123,7 @@ class InfoSekolahController extends GetxController {
       if (image == null) return null;
 
       // Penskalaan (Resize) Cerdas
-      const int maxDimension = 1280; // Sedikit lebih besar untuk info sekolah
+      const int maxDimension = 1280; // Resolusi cukup untuk info sekolah
       if (image.width > maxDimension || image.height > maxDimension) {
         image = img.copyResize(image, width: image.width > image.height ? maxDimension : null, height: image.height > image.width ? maxDimension : null);
         print("### Gambar Info di-resize ke ${image.width}x${image.height} px");
@@ -134,6 +153,70 @@ class InfoSekolahController extends GetxController {
       return null;
     }
   }
+
+  // Future<void> pickImage() async {
+  //   try {
+  //     final ImagePicker picker = ImagePicker();
+  //     // Ambil gambar dengan kualitas asli
+  //     final XFile? pickedFile = await picker.pickImage(source: ImageSource.gallery); 
+  //     if (pickedFile != null) {
+  //       imageFile.value = File(pickedFile.path);
+  //     }
+  //   } catch (e) { Get.snackbar('Error', 'Gagal memilih gambar: $e'); }
+  // }
+
+  void removeImage() {
+    imageFile.value = null;
+    existingImageUrl.value = ''; // Hapus juga gambar lama
+  }
+
+  // Future<File?> _compressImage(File file) async {
+  //   const int targetSizeInBytes = 100 * 1024; // Target 100 KB
+  //   final int initialSize = file.lengthSync();
+
+  //   if (initialSize <= targetSizeInBytes) {
+  //     print("### Gambar Info Sekolah tidak perlu dikompresi.");
+  //     return file;
+  //   }
+
+  //   try {
+  //     final tempDir = await getTemporaryDirectory();
+  //     final String targetPath = '${tempDir.path}/compressed_info_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+  //     img.Image? image = img.decodeImage(file.readAsBytesSync());
+  //     if (image == null) return null;
+
+  //     // Penskalaan (Resize) Cerdas
+  //     const int maxDimension = 1280; // Sedikit lebih besar untuk info sekolah
+  //     if (image.width > maxDimension || image.height > maxDimension) {
+  //       image = img.copyResize(image, width: image.width > image.height ? maxDimension : null, height: image.height > image.width ? maxDimension : null);
+  //       print("### Gambar Info di-resize ke ${image.width}x${image.height} px");
+  //     }
+
+  //     // Kompresi Kualitas Adaptif
+  //     List<int> compressedBytes;
+  //     int quality = 85; 
+
+  //     do {
+  //       compressedBytes = img.encodeJpg(image, quality: quality);
+  //       print("### Kompresi Info dengan kualitas $quality. Ukuran: ${(compressedBytes.length / 1024).toStringAsFixed(2)} KB");
+        
+  //       if (compressedBytes.length > targetSizeInBytes) {
+  //         quality -= 10;
+  //       }
+  //     } while (compressedBytes.length > targetSizeInBytes && quality > 20);
+
+  //     File compressedFile = await File(targetPath).writeAsBytes(compressedBytes);
+  //     final finalSize = compressedFile.lengthSync();
+  //     print("### Kompresi Info FINAL selesai. Ukuran: ${(finalSize / 1024).toStringAsFixed(2)} KB");
+      
+  //     return compressedFile;
+
+  //   } catch (e) {
+  //     Get.snackbar("Error Kompresi", "Gagal memproses gambar: ${e.toString()}");
+  //     return null;
+  //   }
+  // }
 
   Future<String?> _uploadImage(File file, String docId) async {
     try {

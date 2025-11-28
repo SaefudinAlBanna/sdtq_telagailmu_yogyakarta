@@ -123,28 +123,83 @@ class ProfileController extends GetxController {
   }
 
   /// Memilih gambar dari galeri pengguna.
+  // Future<void> pickAndCropImage() async {
+  //   try {
+  //     // 1. Ambil gambar dari galeri
+  //     final picker = ImagePicker();
+  //     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+  //     if (image == null) return; // Pengguna membatalkan
+
+  //     // 2. Pangkas (Crop) gambar menjadi persegi
+  //     CroppedFile? croppedFile = await ImageCropper().cropImage(
+  //       sourcePath: image.path,
+  //       aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1), // Rasio 1:1 untuk foto profil
+  //       uiSettings: [
+  //         AndroidUiSettings(toolbarTitle: 'Pangkas Foto', lockAspectRatio: true),
+  //         IOSUiSettings(title: 'Pangkas Foto', aspectRatioLockEnabled: true),
+  //       ],
+  //     );
+  //     if (croppedFile == null) return; // Pengguna membatalkan crop
+
+  //     // 3. Set gambar yang sudah dipangkas untuk pratinjau
+  //     pickedImage.value = File(croppedFile.path);
+  //   } catch (e) {
+  //     Get.snackbar("Error", "Gagal memilih gambar: $e", backgroundColor: Colors.red, colorText: Colors.white);
+  //   }
+  // }
+
   Future<void> pickAndCropImage() async {
     try {
-      // 1. Ambil gambar dari galeri
+      // Langkah 1: Panggil pemilih gambar sistem.
+      // Di Android modern, ini akan membuka "Android Photo Picker" yang aman.
+      // Pengguna memberikan izin sementara hanya untuk file yang mereka pilih.
       final picker = ImagePicker();
       final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-      if (image == null) return; // Pengguna membatalkan
 
-      // 2. Pangkas (Crop) gambar menjadi persegi
+      // Jika pengguna membatalkan (image == null), hentikan fungsi.
+      if (image == null) {
+        print("Pemilihan gambar dibatalkan oleh pengguna.");
+        return; 
+      }
+
+      // Langkah 2: Panggil pemangkas gambar (image_cropper).
+      // Ini juga aman dan bekerja pada file sementara yang sudah dipilih.
       CroppedFile? croppedFile = await ImageCropper().cropImage(
         sourcePath: image.path,
         aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1), // Rasio 1:1 untuk foto profil
         uiSettings: [
-          AndroidUiSettings(toolbarTitle: 'Pangkas Foto', lockAspectRatio: true),
-          IOSUiSettings(title: 'Pangkas Foto', aspectRatioLockEnabled: true),
+          AndroidUiSettings(
+            toolbarTitle: 'Pangkas Foto', 
+            lockAspectRatio: true,
+            toolbarColor: Colors.deepPurple, // Contoh kustomisasi UI
+            toolbarWidgetColor: Colors.white
+          ),
+          IOSUiSettings(
+            title: 'Pangkas Foto', 
+            aspectRatioLockEnabled: true
+          ),
         ],
       );
-      if (croppedFile == null) return; // Pengguna membatalkan crop
 
-      // 3. Set gambar yang sudah dipangkas untuk pratinjau
+      // Jika pengguna membatalkan proses crop, hentikan fungsi.
+      if (croppedFile == null) {
+        print("Proses pangkas gambar dibatalkan oleh pengguna.");
+        return; 
+      }
+
+      // Langkah 3: Berhasil!
+      // Tampilkan gambar yang sudah dipangkas di UI.
       pickedImage.value = File(croppedFile.path);
+
     } catch (e) {
-      Get.snackbar("Error", "Gagal memilih gambar: $e", backgroundColor: Colors.red, colorText: Colors.white);
+      // Tangani error jika terjadi masalah tak terduga.
+      print("### Terjadi error saat memilih gambar: $e");
+      Get.snackbar(
+        "Error", 
+        "Gagal memilih atau memproses gambar.", 
+        backgroundColor: Colors.red, 
+        colorText: Colors.white
+      );
     }
   }
 

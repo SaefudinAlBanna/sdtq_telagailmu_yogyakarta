@@ -83,12 +83,29 @@ class JadwalPelajaranView extends GetView<JadwalPelajaranController> {
     );
   }
 
-  // Widget untuk Tab hari
+  //// Widget untuk Tab hari
+  // Widget _buildHariTabBar() {
+  //   return Material(
+  //     color: Colors.white,
+  //     elevation: 2,
+  //     child: TabBar(
+  //       controller: controller.tabController,
+  //       isScrollable: true,
+  //       labelColor: Colors.indigo,
+  //       unselectedLabelColor: Colors.grey,
+  //       indicatorColor: Colors.indigo,
+  //       indicatorWeight: 3,
+  //       tabs: controller.daftarHari.map((hari) => Tab(text: hari)).toList(),
+  //     ),
+  //   );
+  // }
+
   Widget _buildHariTabBar() {
-    return Material(
+    return Obx(() => Material( // <-- Tambahkan Obx
       color: Colors.white,
       elevation: 2,
       child: TabBar(
+        key: ValueKey(controller.daftarHari.length), // [Trik Penting] Force rebuild widget TabBar
         controller: controller.tabController,
         isScrollable: true,
         labelColor: Colors.indigo,
@@ -97,20 +114,52 @@ class JadwalPelajaranView extends GetView<JadwalPelajaranController> {
         indicatorWeight: 3,
         tabs: controller.daftarHari.map((hari) => Tab(text: hari)).toList(),
       ),
-    );
+    ));
   }
 
-  // Widget untuk menampilkan konten jadwal
+  // // Widget untuk menampilkan konten jadwal
+  // Widget _buildJadwalContent() {
+  //   return Obx(() {
+  //     if (controller.isLoadingJadwal.value) {
+  //       return const Center(child: CircularProgressIndicator());
+  //     }
+  //     if (controller.selectedKelasId.value == null) {
+  //       return const Center(child: Text("Silakan pilih kelas untuk melihat jadwal.", 
+  //       style: TextStyle(color: Colors.grey)));
+  //     }
+  //     return TabBarView(
+  //       controller: controller.tabController,
+  //       children: controller.daftarHari.map((hari) {
+  //         final jadwalHari = controller.jadwalPelajaran[hari] ?? [];
+  //         if (jadwalHari.isEmpty) {
+  //           return const Center(child: Text("Tidak ada jadwal untuk hari ini."));
+  //         }
+  //         return ListView.builder(
+  //           padding: const EdgeInsets.all(16),
+  //           itemCount: jadwalHari.length,
+  //           itemBuilder: (context, index) {
+  //             final pelajaran = jadwalHari[index];
+  //             return _JadwalCard(pelajaran: pelajaran);
+  //           },
+  //         );
+  //       }).toList(),
+  //     );
+  //   });
+  // }
+
+  
   Widget _buildJadwalContent() {
     return Obx(() {
       if (controller.isLoadingJadwal.value) {
         return const Center(child: CircularProgressIndicator());
       }
       if (controller.selectedKelasId.value == null) {
-        return const Center(child: Text("Silakan pilih kelas untuk melihat jadwal.", 
-        style: TextStyle(color: Colors.grey)));
+        return const Center(child: Text("Silakan pilih kelas..."));
       }
+      
+      // Return TabBarView yang reaktif
       return TabBarView(
+        key: ValueKey(controller.daftarHari.length), // [Trik Penting] Force rebuild
         controller: controller.tabController,
         children: controller.daftarHari.map((hari) {
           final jadwalHari = controller.jadwalPelajaran[hari] ?? [];

@@ -17,7 +17,8 @@ class MasterMapelController extends GetxController {
   final RxList<Map<String, dynamic>> daftarMapel = <Map<String, dynamic>>[].obs;
   final Rxn<String> faseTerpilih = Rxn<String>();
 
-  final List<String> daftarFase = ['fase_a', 'fase_b', 'fase_c'];
+  // final List<String> daftarFase = ['fase_a', 'fase_b', 'fase_c'];
+  final List<String> daftarFase = ['fase_a', 'fase_b', 'fase_c', 'fase_d', 'fase_e'];
 
   final TextEditingController namaMapelC = TextEditingController();
   final TextEditingController singkatanMapelC = TextEditingController();

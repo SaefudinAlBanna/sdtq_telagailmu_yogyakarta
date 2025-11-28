@@ -185,13 +185,20 @@ class PemberianKelasSiswaView extends GetView<PemberianKelasSiswaController> {
           // --- Daftar Guru Reaktif ---
           Expanded(
             child: Obx(() {
-              // Filter daftar guru langsung di dalam Obx
+              // [PERUBAHAN] Filter daftar guru
               final filteredGuru = controller.daftarGuru.where((guru) {
-                  // TAMBAHKAN KONDISI INI
-                  final isNotAssigned = !controller.assignedWaliKelasUids.contains(guru.uid);
+                  // HAPUS baris ini: final isNotAssigned = !controller.assignedWaliKelasUids.contains(guru.uid);
                   
+                  // Kita izinkan semua guru tampil, kecuali guru yang SUDAH menjadi wali kelas di kelas INI.
+                  // (Meskipun logic UI tombolnya "Ganti", mencegah memilih orang yang sama itu UX yang baik)
+                  final dataKelas = controller.kelasTerpilih.value?.data() as Map<String, dynamic>?;
+                  final waliKelasSaatIni = dataKelas?['waliKelasUid'];
+                  final isCurrentWali = guru.uid == waliKelasSaatIni;
+
                   final matchesSearch = guru.nama.toLowerCase().contains(controller.searchQueryGuru.value.toLowerCase());
-                  return isNotAssigned && matchesSearch;
+                  
+                  // Return true jika: Bukan wali kelas saat ini DAN cocok dengan pencarian
+                  return !isCurrentWali && matchesSearch; 
               }).toList();
               
               if (filteredGuru.isEmpty) {

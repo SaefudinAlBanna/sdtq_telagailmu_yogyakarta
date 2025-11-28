@@ -11,7 +11,15 @@ class LaporanAkademikView extends GetView<LaporanAkademikController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Dasbor Pantauan Akademik")),
+      appBar: AppBar(title: const Text("Dasbor Pantauan Akademik"),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.school_outlined),
+          onPressed: () => controller.goToGuruAkademik(),
+          tooltip: "Akademik",
+        ),
+      ],
+      ),
       body: Obx(() {
         if (controller.isLoading.value) {
           return const Center(child: CircularProgressIndicator());

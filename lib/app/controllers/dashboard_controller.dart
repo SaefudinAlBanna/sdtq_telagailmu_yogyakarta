@@ -167,9 +167,9 @@ class DashboardController extends GetxController {
         quickAccessMenus.add({'image': 'papan_list.png', 'title': 'Rekap Absensi', 'onTap': goToRekapAbsensiSekolah});
         quickAccessMenus.add({'image': 'kamera_layar.png', 'title': 'Jurnal Kelas', 'route': Routes.LAPORAN_JURNAL_KELAS});
     } else {
-        quickAccessMenus.add({'image': 'daftar_tes.png', 'title': 'Guru Akademik', 'route': Routes.GURU_AKADEMIK});
-        quickAccessMenus.add({'image': 'daftar_tes.png', 'title': 'Dashboard Halaqah', 'onTap': goToHalaqahDashboard});
-        quickAccessMenus.add({'image': 'play.png', 'title': 'Jurnal Ajar', 'route': Routes.JURNAL_HARIAN_GURU});
+        quickAccessMenus.add({'image': 'abc.png', 'title': 'Guru Akademik', 'route': Routes.GURU_AKADEMIK});
+        quickAccessMenus.add({'image': 'buku_2.png', 'title': 'Dashboard Halaqah', 'onTap': goToHalaqahDashboard});
+        quickAccessMenus.add({'image': 'daftar_list.png', 'title': 'Jurnal Ajar', 'route': Routes.JURNAL_HARIAN_GURU});
         quickAccessMenus.add({'image': 'jurnal_ajar.png', 'title': 'Jurnal Pribadi', 'route': Routes.LAPORAN_JURNAL_PRIBADI});
     }
 
@@ -179,12 +179,12 @@ class DashboardController extends GetxController {
       quickAccessMenus.add({'image': 'abc_papan.png', 'title': 'Perangkat Ajar', 'route': Routes.PERANGKAT_AJAR});
     }
 
-    quickAccessMenus.add({'image': 'layar.png', 'title': 'Jadwal Pelajaran', 'route': Routes.JADWAL_PELAJARAN});
+    quickAccessMenus.add({'image': 'layar_2.png', 'title': 'Jadwal Pelajaran', 'route': Routes.JADWAL_PELAJARAN});
     if (isBendaharaOrPimpinan) {
     quickAccessMenus.add({'image': 'uang.png', 'title': 'Buku Besar', 'route': Routes.LAPORAN_KEUANGAN_SEKOLAH});
     // quickAccessMenus.add({'image': 'uang.png', 'title': 'Kategori Keuangan', 'route': Routes.MANAJEMEN_KATEGORI_KEUANGAN});
     } else {
-      quickAccessMenus.add({'image': 'kamera_layar.png', 'title': 'Kalender Akademik', 'route': Routes.MANAJEMEN_KALENDER_AKADEMIK});
+      quickAccessMenus.add({'image': 'papan_list.png', 'title': 'Kalender Akademik', 'route': Routes.MANAJEMEN_KALENDER_AKADEMIK});
     }
     quickAccessMenus.add({'image': 'faq.png', 'title': 'Lainnya', 'onTap': () => _showAllMenusInView(Get.context!)});
 
@@ -193,7 +193,7 @@ class DashboardController extends GetxController {
     }
 
     if (canManageKbm) {
-      additionalMenus.add({'image': 'toga_lcd.png', 'title': 'Pemberian Kelas', 'route': Routes.PEMBERIAN_KELAS_SISWA});
+      additionalMenus.add({'image': 'layar_list.png', 'title': 'Pemberian Kelas', 'route': Routes.PEMBERIAN_KELAS_SISWA});
       additionalMenus.add({'image': 'akademik_1.png', 'title': 'Manajemen Buku', 'route': Routes.MANAJEMEN_PENAWARAN_BUKU});
     }
     if (kepalaSekolah || canManageHalaqah) {
@@ -204,14 +204,14 @@ class DashboardController extends GetxController {
     //   additionalMenus.add({'image': 'papan_list.png', 'title': 'Jadwal Ujian Ummi', 'route': Routes.HALAQAH_UMMI_JADWAL_PENGUJI});
     // }
     if (isPenguji) {
-      additionalMenus.add({'image': 'papan_list.png', 'title': 'Ujian Al-Husna', 'route': Routes.JADWAL_UJIAN_PENGUJI});
+      additionalMenus.add({'image': 'quiz.png', 'title': 'Ujian Al-Husna', 'route': Routes.JADWAL_UJIAN_PENGUJI});
     }
     additionalMenus.add({'image': 'daftar_list.png', 'title': 'Daftar Pegawai', 'route': Routes.PEGAWAI});
     additionalMenus.add({'image': 'daftar_tes.png', 'title': 'Daftar siswa', 'route': Routes.DAFTAR_SISWA});
     additionalMenus.add({'image': 'pengumuman.png', 'title': 'Info Sekolah', 'route': Routes.INFO_SEKOLAH});
     // additionalMenus.add({'image': 'kamera_layar.png', 'title': 'Master Ekskul', 'route': Routes.MASTER_EKSKUL_MANAGEMENT});
     if (isBendaharaOrPimpinan) {
-    additionalMenus.add({'image': 'akademik_2.png', 'title': 'Kalender Akademik', 'route': Routes.MANAJEMEN_KALENDER_AKADEMIK});
+    additionalMenus.add({'image': 'papan_list.png', 'title': 'Kalender Akademik', 'route': Routes.MANAJEMEN_KALENDER_AKADEMIK});
     }
     additionalMenus.add({'image': 'ktp.png', 'title': 'Laporan Pengganti', 'route': Routes.PUSAT_INFORMASI_PENGGANTIAN});
     additionalMenus.add({'image': 'kamera_layar.png', 'title': 'Master Ekskul', 'route': Routes.MASTER_EKSKUL_MANAGEMENT});

@@ -45,6 +45,19 @@ class InputNilaiSiswaController extends GetxController with GetTickerProviderSta
   final harianC = TextEditingController(), ulanganC = TextEditingController(), 
         ptsC = TextEditingController(), pasC = TextEditingController(), 
         tambahanC = TextEditingController();
+
+  
+  List<NilaiHarianModel> get listTugasDisplay {
+    return daftarNilaiHarian.where((e) => 
+      e.kategori == 'PR' || e.kategori == 'Harian/PR' || e.kategori == 'Tugas'
+    ).toList();
+  }
+
+  List<NilaiHarianModel> get listUlanganDisplay {
+    return daftarNilaiHarian.where((e) => 
+      e.kategori == 'Ulangan' || e.kategori == 'Ulangan Harian'
+    ).toList();
+  }
   
   @override
   void onInit() {
@@ -112,7 +125,11 @@ class InputNilaiSiswaController extends GetxController with GetTickerProviderSta
         _fetchAtp(),
       ]);
       hitungNilaiAkhir();
-    } catch (e) { Get.snackbar("Error", "Gagal memuat data nilai siswa: $e"); } 
+    } catch (e) { 
+      Get.snackbar("Error", "Gagal memuat data nilai siswa: $e"); 
+      print("### ERROR LOAD INITIAL DATA: $e");
+    } 
+    
     finally { isLoading.value = false; }
   }
 
@@ -197,22 +214,6 @@ class InputNilaiSiswaController extends GetxController with GetTickerProviderSta
     if (capaianTpSiswa[tp] == status) { capaianTpSiswa.remove(tp); } 
     else { capaianTpSiswa[tp] = status; }
   }
-
-  // Future<void> simpanSemuaCapaian() async {
-  //   isSaving.value = true;
-  //   try {
-  //     await siswaMapelRef.set({
-  //       'deskripsi_capaian': deskripsiCapaianC.text.trim(),
-  //       'capaian_tp': capaianTpSiswa,
-  //       'idGuruPencatat': idGuruPencatat,
-  //       'namaGuruPencatat': namaGuruPencatat,
-  //       'aliasGuruPencatatAkhir': aliasGuruPencatat, // Perbaikan: Gunakan 'aliasGuruPencatatAkhir'
-  //       'lastEdited': FieldValue.serverTimestamp(),
-  //     }, SetOptions(merge: true));
-  //     Get.snackbar("Berhasil", "Capaian pembelajaran berhasil disimpan.");
-  //   } catch (e) { Get.snackbar("Error", "Gagal menyimpan capaian: $e"); } 
-  //   finally { isSaving.value = false; }
-  // }
 
   Future<void> simpanSemuaCapaian() async {
     isSaving.value = true;
@@ -312,6 +313,7 @@ class InputNilaiSiswaController extends GetxController with GetTickerProviderSta
   }
 
   Future<void> fetchNilaiHarian() async {
+    // Hapus print debug, kembalikan ke kode bersih
     final snapshot = await siswaMapelRef.collection('nilai_harian').orderBy('tanggal', descending: true).get();
     daftarNilaiHarian.assignAll(snapshot.docs.map((doc) => NilaiHarianModel.fromFirestore(doc)).toList());
   }
@@ -465,9 +467,21 @@ class InputNilaiSiswaController extends GetxController with GetTickerProviderSta
   
   double _calculateAverage(String kategori) {
     var listNilai = daftarNilaiHarian.where((n) {
-      if (kategori == "Harian/PR") return n.kategori == "Harian/PR" || n.kategori == "PR";
+      // 1. Logika untuk Tugas/PR (Sudah Ada & Benar)
+      if (kategori == "Harian/PR") {
+        return n.kategori == "Harian/PR" || n.kategori == "PR";
+      }
+      
+      // 2. [PERBAIKAN] Logika untuk Ulangan
+      // Kita terima baik "Ulangan Harian" (format lama) maupun "Ulangan" (format baru dari tugas)
+      if (kategori == "Ulangan Harian") {
+        return n.kategori == "Ulangan Harian" || n.kategori == "Ulangan";
+      }
+
+      // 3. Default match
       return n.kategori == kategori;
     }).toList();
+
     if (listNilai.isEmpty) return 0;
     return listNilai.fold(0, (sum, item) => sum + item.nilai) / listNilai.length;
   }

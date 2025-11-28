@@ -20,7 +20,8 @@ class EditorJadwalController extends GetxController {
   final Rxn<String> selectedKelasId = Rxn<String>();
   final RxString selectedHari = 'Senin'.obs;
   final RxMap<String, RxList<Map<String, dynamic>>> jadwalPelajaran = <String, RxList<Map<String, dynamic>>>{}.obs;
-  final List<String> daftarHari = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+  // final List<String> daftarHari = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+  final RxList<String> daftarHari = <String>['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'].obs;
 
   // --- [PEROMBAKAN] State untuk data sumber ---
   final RxList<Map<String, dynamic>> daftarJamMaster = <Map<String, dynamic>>[].obs;
@@ -64,6 +65,16 @@ class EditorJadwalController extends GetxController {
     isLoading.value = false;
   }
 
+  // Future<void> _fetchDaftarKelas() async {
+  //   if (tahunAjaranAktif.isEmpty || tahunAjaranAktif.contains("TIDAK DITEMUKAN")) {
+  //     Get.snackbar("Kesalahan Konfigurasi", "Tahun ajaran aktif tidak ditemukan.");
+  //     daftarKelas.clear();
+  //     return;
+  //   }
+  //   final snapshot = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('kelas').where('tahunAjaran', isEqualTo: tahunAjaranAktif).orderBy('namaKelas').get();
+  //   daftarKelas.value = snapshot.docs.map((doc) => {'id': doc.id, 'nama': doc.data()['namaKelas'] ?? doc.id}).toList();
+  // }
+
   Future<void> _fetchDaftarKelas() async {
     if (tahunAjaranAktif.isEmpty || tahunAjaranAktif.contains("TIDAK DITEMUKAN")) {
       Get.snackbar("Kesalahan Konfigurasi", "Tahun ajaran aktif tidak ditemukan.");
@@ -71,15 +82,59 @@ class EditorJadwalController extends GetxController {
       return;
     }
     final snapshot = await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('kelas').where('tahunAjaran', isEqualTo: tahunAjaranAktif).orderBy('namaKelas').get();
-    daftarKelas.value = snapshot.docs.map((doc) => {'id': doc.id, 'nama': doc.data()['namaKelas'] ?? doc.id}).toList();
+    
+    // [PERBAIKAN] Simpan juga 'fase' dari dokumen kelas
+    daftarKelas.value = snapshot.docs.map((doc) {
+      final data = doc.data();
+      return {
+        'id': doc.id, 
+        'nama': data['namaKelas'] ?? doc.id,
+        'fase': data['fase'] ?? 'fase_a', // Default ke SD jika null
+      };
+    }).toList();
   }
+
+  // Future<void> onKelasChanged(String? kelasId) async {
+  //   if (kelasId == null) return;
+  //   selectedKelasId.value = kelasId;
+  //   _clearJadwal();
+  //   isLoadingJadwal.value = true;
+  //   // [PEROMBAKAN] _fetchDaftarJam sekarang menjadi _fetchMasterJam
+  //   await Future.wait([ _fetchJadwal(), _fetchMasterJam(), _fetchGuruDanMapel() ]);
+  //   isLoadingJadwal.value = false;
+  // }
 
   Future<void> onKelasChanged(String? kelasId) async {
     if (kelasId == null) return;
     selectedKelasId.value = kelasId;
     _clearJadwal();
     isLoadingJadwal.value = true;
-    // [PEROMBAKAN] _fetchDaftarJam sekarang menjadi _fetchMasterJam
+
+    // [LOGIKA ADAPTIF BARU]
+    // 1. Cari data kelas yang dipilih untuk melihat fasenya
+    final kelasData = daftarKelas.firstWhere((k) => k['id'] == kelasId, orElse: () => {});
+    final String fase = (kelasData['fase'] as String? ?? '').toLowerCase();
+
+    // 2. Tentukan daftar hari berdasarkan fase
+    // Fase D (SMP), E (SMA), F (SMA Lanjut) --> 6 HARI (Senin - Sabtu)
+    if (fase.contains('fase d') || fase.contains('fase e') || fase.contains('fase f')) {
+      daftarHari.assignAll(['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']);
+    } else {
+      // Fase A, B, C (SD) --> 5 HARI (Senin - Jumat)
+      daftarHari.assignAll(['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat']);
+    }
+
+    // 3. Reset selektor hari ke Senin agar aman
+    selectedHari.value = 'Senin';
+    
+    // 4. Inisialisasi map jadwalPelajaran untuk hari-hari baru (terutama Sabtu)
+    for (var hari in daftarHari) {
+      if (!jadwalPelajaran.containsKey(hari)) {
+        jadwalPelajaran[hari] = <Map<String, dynamic>>[].obs;
+      }
+    }
+
+    // Lanjut ambil data seperti biasa...
     await Future.wait([ _fetchJadwal(), _fetchMasterJam(), _fetchGuruDanMapel() ]);
     isLoadingJadwal.value = false;
   }
@@ -286,31 +341,70 @@ class EditorJadwalController extends GetxController {
     jadwalPelajaran[selectedHari.value]?.removeAt(index); 
   }
   
+  // Future<void> simpanJadwal() async {
+  //   if (selectedKelasId.value == null) return;
+  //   isSaving.value = true;
+    
+  //   // [VALIDASI BARU] Cek bentrok internal dulu
+  //   String? internalClash = _validateInternalClash();
+  //   if (internalClash != null) {
+  //     Get.snackbar('Jadwal Bentrok!', internalClash, backgroundColor: Colors.red, colorText: Colors.white, duration: const Duration(seconds: 5));
+  //     isSaving.value = false;
+  //     return;
+  //   }
+
+  //   final String? guruClash = await _validateGuruClash();
+  //   if (guruClash != null) {
+  //     Get.snackbar('Jadwal Bentrok!', guruClash, backgroundColor: Colors.red, colorText: Colors.white, duration: const Duration(seconds: 5));
+  //     isSaving.value = false;
+  //     return;
+  //   }
+
+  //   try {
+  //     Map<String, List<Map<String, dynamic>>> dataToSave = {};
+  //     jadwalPelajaran.forEach((hari, list) { dataToSave[hari] = list.toList(); });
+      
+  //     await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('tahunajaran').doc(tahunAjaranAktif).collection('jadwalkelas').doc(selectedKelasId.value!).set(dataToSave);
+  //     Get.snackbar('Berhasil', 'Jadwal pelajaran berhasil disimpan.');
+  //   } catch (e) { Get.snackbar('Error', 'Gagal menyimpan jadwal: ${e.toString()}'); } 
+  //   finally { isSaving.value = false; }
+  // }
+
   Future<void> simpanJadwal() async {
     if (selectedKelasId.value == null) return;
     isSaving.value = true;
     
-    // [VALIDASI BARU] Cek bentrok internal dulu
-    String? internalClash = _validateInternalClash();
-    if (internalClash != null) {
-      Get.snackbar('Jadwal Bentrok!', internalClash, backgroundColor: Colors.red, colorText: Colors.white, duration: const Duration(seconds: 5));
-      isSaving.value = false;
-      return;
+    // ============================================================
+    // 🔧 KONFIGURASI SEMENTARA: MATIKAN CEK BENTROK
+    // Ubah nilai ini menjadi 'true' jika ingin mengaktifkan kembali.
+    bool aktifkanValidasiBentrok = false; 
+    // ============================================================
+
+    if (aktifkanValidasiBentrok) {
+      // [VALIDASI 1] Cek bentrok internal (dalam 1 kelas)
+      String? internalClash = _validateInternalClash();
+      if (internalClash != null) {
+        Get.snackbar('Jadwal Bentrok!', internalClash, backgroundColor: Colors.red, colorText: Colors.white, duration: const Duration(seconds: 5));
+        isSaving.value = false;
+        return;
+      }
+
+      // [VALIDASI 2] Cek bentrok Guru (antar kelas)
+      final String? guruClash = await _validateGuruClash();
+      if (guruClash != null) {
+        Get.snackbar('Jadwal Bentrok!', guruClash, backgroundColor: Colors.red, colorText: Colors.white, duration: const Duration(seconds: 5));
+        isSaving.value = false;
+        return;
+      }
     }
 
-    final String? guruClash = await _validateGuruClash();
-    if (guruClash != null) {
-      Get.snackbar('Jadwal Bentrok!', guruClash, backgroundColor: Colors.red, colorText: Colors.white, duration: const Duration(seconds: 5));
-      isSaving.value = false;
-      return;
-    }
-
+    // --- PROSES SIMPAN (Tetap Berjalan) ---
     try {
       Map<String, List<Map<String, dynamic>>> dataToSave = {};
       jadwalPelajaran.forEach((hari, list) { dataToSave[hari] = list.toList(); });
       
       await _firestore.collection('Sekolah').doc(configC.idSekolah).collection('tahunajaran').doc(tahunAjaranAktif).collection('jadwalkelas').doc(selectedKelasId.value!).set(dataToSave);
-      Get.snackbar('Berhasil', 'Jadwal pelajaran berhasil disimpan.');
+      Get.snackbar('Berhasil', 'Jadwal pelajaran berhasil disimpan (Validasi Bentrok: OFF).');
     } catch (e) { Get.snackbar('Error', 'Gagal menyimpan jadwal: ${e.toString()}'); } 
     finally { isSaving.value = false; }
   }

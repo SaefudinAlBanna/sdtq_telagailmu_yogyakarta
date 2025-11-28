@@ -63,10 +63,9 @@ class InfoSekolahFormView extends GetView<InfoSekolahController> {
   }
 
   Widget _buildImageUploader() {
-    // --- [PERBAIKAN KUNCI DI SINI] ---
-    // Sintaks yang benar dan aman untuk DottedBorder
     return GestureDetector(
-      onTap: controller.pickImage,
+      // [PERBAIKAN DI SINI] Ganti `pickImage` dengan fungsi baru Anda
+      onTap: controller.pilihDanKompresGambarInfo, 
       child: DottedBorder(
           options: RoundedRectDottedBorderOptions(
             dashPattern: const [8, 4],

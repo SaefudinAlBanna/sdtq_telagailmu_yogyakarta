@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import '../../../controllers/auth_controller.dart';
 import '../../../controllers/config_controller.dart';
 import '../../../models/jadwal_tugas_item_model.dart';
+import '../../../routes/app_pages.dart';
 
 class JurnalHarianGuruController extends GetxController {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -282,6 +283,10 @@ class JurnalHarianGuruController extends GetxController {
       tugasTerpilih.clear();
     } catch (e) { Get.snackbar("Gagal Menyimpan", "Terjadi kesalahan: ${e.toString()}"); } 
     finally { isSaving.value = false; }
+  }
+
+  void goToJurnalPribadi() {
+    Get.toNamed(Routes.LAPORAN_JURNAL_PRIBADI);
   }
 
   @override

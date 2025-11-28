@@ -176,11 +176,13 @@ class InputNilaiMassalAkademikController extends GetxController {
 
     try {
       for (final siswa in daftarSiswa) {
+        // 1. Lewati siswa yang ditandai absen/tidak dinilai
         if (absentStudents.contains(siswa.uid)) continue; 
 
         final controller = textControllers[siswa.uid];
         final nilaiString = controller?.text.trim();  
 
+        // 2. Lewati jika input kosong
         if (nilaiString == null || nilaiString.isEmpty) continue; 
 
         final int? nilai = int.tryParse(nilaiString); 
@@ -193,6 +195,7 @@ class InputNilaiMassalAkademikController extends GetxController {
 
         validGradesCount++; 
 
+        // --- REFERENSI PATH ---
         final siswaMapelRef = _firestore
             .collection('Sekolah').doc(configC.idSekolah)
             .collection('tahunajaran').doc(configC.tahunAjaranAktif.value)
@@ -201,14 +204,27 @@ class InputNilaiMassalAkademikController extends GetxController {
             .collection('semester').doc(configC.semesterAktif.value)
             .collection('matapelajaran').doc(idMapel);
         
+        // Update Metadata Mapel (Safe Update)
         batch.set(siswaMapelRef, {
           'idMapel': idMapel, 'namaMapel': namaMapel, 'idGuru': idGuruPencatat,
           'namaGuru': namaGuruPencatat, 'aliasGuruPencatatAkhir': aliasGuruPencatat,
         }, SetOptions(merge: true));  
 
-        final nilaiRef = siswaMapelRef.collection('nilai_harian').doc(); 
+        // --- [PERBAIKAN UTAMA: LOGIKA ID DETERMINISTIK] ---
+        DocumentReference nilaiRef;
+
+        if (idTugasUlangan != null && idTugasUlangan!.isNotEmpty) {
+          // A. JIKA DARI TUGAS/ULANGAN:
+          // Gunakan ID Tugas sebagai ID Dokumen Nilai.
+          // Ini MENJAMIN 1 Tugas hanya punya 1 Nilai per Siswa (Anti-Duplikat).
+          nilaiRef = siswaMapelRef.collection('nilai_harian').doc(idTugasUlangan);
+        } else {
+          // B. JIKA MANUAL (TANPA TUGAS):
+          // Gunakan ID acak (biarkan behavior lama untuk input manual bebas)
+          nilaiRef = siswaMapelRef.collection('nilai_harian').doc();
+        }
         
-        // [PERBAIKAN KUNCI DI SINI] Tambahkan semua field yang dibutuhkan
+        // Simpan Data Nilai
         batch.set(nilaiRef, {
           'kategori': kategoriTugas, 
           'nilai': nilai, 
@@ -217,19 +233,21 @@ class InputNilaiMassalAkademikController extends GetxController {
           'idGuruPencatat': idGuruPencatat,
           'namaGuruPencatat': namaGuruPencatat, 
           'aliasGuruPencatat': aliasGuruPencatat,
-          'idTugasUlangan': idTugasUlangan,
+          'idTugasUlangan': idTugasUlangan, // Bisa null, tidak masalah
           'idSekolah': configC.idSekolah,
           'idMapel': idMapel,
           'kelasId': idKelas,
           'semester': int.parse(configC.semesterAktif.value),
-        }); 
+        }, SetOptions(merge: true)); // Merge agar aman saat update
 
+        // --- NOTIFIKASI (OPSIONAL: Hanya kirim jika nilai baru/berubah) ---
+        // Untuk efisiensi di batch write, kita tetap kirim notif agar siswa tau ada update nilai.
         final siswaDocRef = _firestore.collection('Sekolah').doc(configC.idSekolah).collection('siswa').doc(siswa.uid);
-        
         final notifRef = siswaDocRef.collection('notifikasi').doc();
+        
         batch.set(notifRef, {
-          'judul': 'Nilai Baru: $namaMapel',
-          'isi': 'Ananda ${siswa.namaLengkap} mendapatkan nilai $nilai untuk "$judulTugas".',
+          'judul': 'Nilai Baru/Update: $namaMapel',
+          'isi': 'Nilai untuk "$judulTugas" adalah $nilai.',
           'tipe': 'NILAI_MAPEL',
           'tanggal': FieldValue.serverTimestamp(),
           'isRead': false,
@@ -237,34 +255,28 @@ class InputNilaiMassalAkademikController extends GetxController {
         }); 
 
         final metaRef = siswaDocRef.collection('notifikasi_meta').doc('metadata');
-        batch.set(metaRef, {'unreadCount': FieldValue.increment(1), 'idSekolah': configC.idSekolah}, 
-        SetOptions(merge: true));
+        batch.set(metaRef, {'unreadCount': FieldValue.increment(1), 'idSekolah': configC.idSekolah}, SetOptions(merge: true));
       } 
 
       if (validGradesCount == 0) {
-        Get.snackbar("Informasi", "Tidak ada nilai baru yang diinput untuk disimpan.",
-          backgroundColor: Colors.blueAccent, colorText: Colors.white,
-        );
+        Get.snackbar("Informasi", "Tidak ada nilai untuk disimpan.", backgroundColor: Colors.blueAccent, colorText: Colors.white);
         isSaving.value = false;
         return;
       } 
 
       await batch.commit();
       
+      // Refresh data di controller sebelumnya jika ada
       if (Get.isRegistered<ManajemenTugasController>()) {
         final mtController = Get.find<ManajemenTugasController>();
-        mtController.fetchTugas();
+        mtController.fetchTugas(); // Opsional: refresh list tugas
       }
+      
       Get.back();   
-
-      Get.snackbar("Berhasil", "$validGradesCount nilai berhasil disimpan.",
-        backgroundColor: Colors.green, colorText: Colors.white,
-      );  
+      Get.snackbar("Berhasil", "$validGradesCount nilai berhasil disimpan/diupdate.", backgroundColor: Colors.green, colorText: Colors.white);  
 
     } catch (e) {
-      Get.snackbar("Error", "Terjadi kesalahan saat menyimpan: ${e.toString()}",
-        backgroundColor: Colors.red, colorText: Colors.white,
-      );
+      Get.snackbar("Error", "Terjadi kesalahan saat menyimpan: ${e.toString()}", backgroundColor: Colors.red, colorText: Colors.white);
     } finally {
       isSaving.value = false;
     }

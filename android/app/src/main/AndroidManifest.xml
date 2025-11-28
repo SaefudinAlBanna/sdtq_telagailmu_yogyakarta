@@ -2,20 +2,26 @@
     xmlns:tools="http://schemas.android.com/tools">
 
    <!-- =================================================================== -->
-   <!-- SEMUA IZIN <uses-permission> HARUS BERADA DI SINI, SEBELUM <application> -->
+   <!-- PERIZINAN YANG DIBUTUHKAN                                           -->
    <!-- =================================================================== -->
+   
+   <!-- Izin untuk Geolokasi (Tidak terkait penolakan, jadi AMAN untuk dipertahankan) -->
    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-   <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
-   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+   
+   <!-- [DIHAPUS] Izin ini adalah penyebab utama penolakan. Hapus! -->
+   <!-- <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/> -->
+   
+   <!-- [DIHAPUS] Izin lama ini juga penyebab penolakan. Hapus! -->
+   <!-- <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" /> -->
 
-   <!-- [DIPINDAHKAN] Aturan ini harus di luar <application> -->
+   <!-- [AMAN] Aturan ini untuk menghapus izin ID Iklan, sudah benar. -->
    <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove"/>
 
     <application
         android:label="PKBM Telagailmu"
         android:name="${applicationName}"
-        android:icon="@mipmap/launcher_icon">
+        android:icon="@mipmap/ic_launcher">
         
         <activity
             android:name=".MainActivity"
@@ -37,7 +43,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Deklarasi Activity untuk Image Cropper -->
+        <!-- [PENTING & SUDAH BENAR] Deklarasi Activity untuk Image Cropper. Ini harus tetap ada. -->
         <activity
             android:name="com.yalantis.ucrop.UCropActivity"
             android:screenOrientation="portrait"
@@ -49,6 +55,7 @@
             android:value="2" />
     </application>
     
+    <!-- [SUDAH BENAR] Biarkan bagian queries ini apa adanya. -->
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>

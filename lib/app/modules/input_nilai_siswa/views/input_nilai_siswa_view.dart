@@ -266,10 +266,24 @@ class InputNilaiSiswaView extends GetView<InputNilaiSiswaController> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Obx(() {
-          final listNilai = controller.daftarNilaiHarian.where((n) {
-            if (kategori == "Harian/PR") return n.kategori == "Harian/PR" || n.kategori == "PR";
-            return n.kategori == kategori;
-          }).toList();
+          // --- [PERBAIKAN UTAMA DI SINI] ---
+          // Kita pilih sumber data berdasarkan Tab Kategori yang aktif
+          List<NilaiHarianModel> listNilai;
+
+          if (kategori == "Harian/PR") {
+            // Gunakan Getter Cerdas dari Controller untuk Tugas
+            listNilai = controller.listTugasDisplay; 
+          } 
+          else if (kategori == "Ulangan Harian") {
+            // Gunakan Getter Cerdas dari Controller untuk Ulangan
+            // Ini akan menampilkan data yang tersimpan sebagai "Ulangan" MAUPUN "Ulangan Harian"
+            listNilai = controller.listUlanganDisplay;
+          } 
+          else {
+            // Untuk kategori lain (misal: Nilai Tambahan), gunakan filter standar
+            listNilai = controller.daftarNilaiHarian.where((n) => n.kategori == kategori).toList();
+          }
+          // --- [AKHIR PERBAIKAN] ---
 
           if (listNilai.isEmpty) return Padding(
             padding: const EdgeInsets.symmetric(vertical: 32.0),
@@ -305,6 +319,8 @@ class InputNilaiSiswaView extends GetView<InputNilaiSiswaController> {
           );
         }),
         const SizedBox(height: 16),
+        
+        // Tombol Tambah Manual
         ElevatedButton.icon(
           icon: const Icon(Icons.add),
           label: Text("Tambah Nilai $kategori"),

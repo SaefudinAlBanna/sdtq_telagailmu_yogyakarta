@@ -33,7 +33,8 @@ class ManajemenKalenderAkademikController extends GetxController {
   final Rx<DateTime> tanggalMulai = DateTime.now().obs;
   final Rx<DateTime> tanggalSelesai = DateTime.now().obs;
   final RxBool isLibur = false.obs;
-  final Rx<Color> warnaTerpilih = Colors.blue.obs;
+  // final Rx<Color> warnaTerpilih = Colors.blue.obs;
+  final Rx<Color> warnaTerpilih = const Color(0xFF2196F3).obs;
   final RxBool isFormLoading = false.obs;
 
   @override
@@ -121,20 +122,42 @@ class ManajemenKalenderAkademikController extends GetxController {
   String _colorToHex(Color color) => '#${color.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
 
   void showColorPickerDialog() {
-    final Rx<Color> dialogPickerColor = warnaTerpilih.value.obs; // Gunakan Rx<Color> sementara
+    // 1. Gunakan variabel lokal biasa, bukan Rx.
+    // Ini mencegah konflik gesture dan rebuild yang tidak perlu.
+    Color tempColor = warnaTerpilih.value; 
+
     Get.dialog(
       AlertDialog(
         title: const Text('Pilih Warna Acara'),
-        content: Obx(() => SingleChildScrollView( // Obx untuk rebuild saat warna berubah
-          child: ColorPicker(
-            pickerColor: dialogPickerColor.value,
-            onColorChanged: (color) => dialogPickerColor.value = color, // Perbarui Rx<Color>
+        content: SingleChildScrollView(
+          child: ColorPicker( // HAPUS OBX DI SINI
+            pickerColor: tempColor,
+            onColorChanged: (color) {
+              // Update variabel lokal saja. Tidak perlu trigger update UI controller dulu.
+              tempColor = color; 
+            },
+            // Konfigurasi tambahan agar tampilan lebih rapi
+            enableAlpha: false,
+            displayThumbColor: true,
+            paletteType: PaletteType.hsvWithHue,
+            labelTypes: const [],
+            pickerAreaHeightPercent: 0.8,
           ),
-        )),
-        actions: [ ElevatedButton(child: const Text('Pilih'), onPressed: () {
-          warnaTerpilih.value = dialogPickerColor.value; // Assign nilai final
-          Get.back();
-        })],
+        ),
+        actions: [
+          TextButton(
+            child: const Text('Batal'), 
+            onPressed: () => Get.back(),
+          ),
+          ElevatedButton(
+            child: const Text('Pilih'), 
+            onPressed: () {
+              // BARU update state controller di sini saat user yakin
+              warnaTerpilih.value = tempColor; 
+              Get.back();
+            }
+          ),
+        ],
       ),
     );
   }

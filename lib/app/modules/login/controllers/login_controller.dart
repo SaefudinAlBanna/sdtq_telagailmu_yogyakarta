@@ -17,6 +17,8 @@ class LoginController extends GetxController {
   final TextEditingController emailC = TextEditingController();
   final TextEditingController passC = TextEditingController();
 
+  final String appVersion = "Versi 1.0.0";
+
   StreamSubscription? _authNavSubscription;
 
   @override

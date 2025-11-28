@@ -359,49 +359,99 @@ class LaporanKeuanganSekolahController extends GetxController with GetTickerProv
     );
   }
 
+  // Future<void> _pilihDanKompresGambar() async {
+  //   final picker = ImagePicker();
+  //   final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+  //   if (pickedFile == null) return;
+
+  //   isUploading.value = true;
+  //   try {
+  //     File fileToCompress = File(pickedFile.path);
+  //     int currentQuality = 85;
+  //     const targetSizeInBytes = 50 * 1024; // 50 KB
+
+  //     // [PERBAIKAN KUNCI] Loop kompresi dengan kondisi yang lebih baik
+  //     while (await fileToCompress.length() > targetSizeInBytes && currentQuality >= 5) { // Gunakan >=
+  //       final targetPath = "${Directory.systemTemp.path}/${DateTime.now().millisecondsSinceEpoch}.jpg";
+
+  //       final result = await FlutterImageCompress.compressAndGetFile(
+  //         fileToCompress.path,
+  //         targetPath,
+  //         quality: currentQuality,
+  //         minWidth: 800,
+  //         minHeight: 800,
+  //       );
+
+  //       if (result != null) {
+  //         // Hapus file sementara sebelumnya untuk menghemat ruang
+  //         if (fileToCompress.path != pickedFile.path) {
+  //           await fileToCompress.delete();
+  //         }
+  //         fileToCompress = File(result.path);
+  //         print("### Kompresi dengan kualitas $currentQuality. Ukuran baru: ${await fileToCompress.length()} bytes");
+  //       }
+
+  //       currentQuality -= 10;
+  //     }
+
+  //     buktiTransaksiFile.value = fileToCompress;
+  //     print("### Kompresi FINAL selesai. Ukuran akhir: ${await fileToCompress.length()} bytes");
+
+  //   } catch (e) {
+  //     Get.snackbar("Error", "Gagal mengompres gambar: $e");
+  //     buktiTransaksiFile.value = null;
+  //   } finally {
+  //     isUploading.value = false;
+  //   }
+  // }
+
   Future<void> _pilihDanKompresGambar() async {
+    // Langkah 1: Panggil pemilih foto sistem.
+    // Pengguna akan memilih satu gambar dari galeri mereka dalam lingkungan yang aman.
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+    // Jika pengguna membatalkan (tidak memilih gambar), hentikan fungsi.
     if (pickedFile == null) return;
 
-    isUploading.value = true;
+    isUploading.value = true; // Tampilkan indikator loading di UI
     try {
+      // Langkah 2: Lakukan kompresi pada gambar yang telah dipilih.
+      // Logika kompresi ini tidak berhubungan dengan izin, ini murni untuk
+      // efisiensi ukuran file sebelum diunggah.
       File fileToCompress = File(pickedFile.path);
       int currentQuality = 85;
-      const targetSizeInBytes = 50 * 1024; // 50 KB
+      const targetSizeInBytes = 50 * 1024; // Target 50 KB
 
-      // [PERBAIKAN KUNCI] Loop kompresi dengan kondisi yang lebih baik
-      while (await fileToCompress.length() > targetSizeInBytes && currentQuality >= 5) { // Gunakan >=
+      while (await fileToCompress.length() > targetSizeInBytes && currentQuality >= 5) {
         final targetPath = "${Directory.systemTemp.path}/${DateTime.now().millisecondsSinceEpoch}.jpg";
 
         final result = await FlutterImageCompress.compressAndGetFile(
           fileToCompress.path,
           targetPath,
           quality: currentQuality,
-          minWidth: 800,
+          minWidth: 800, // Menjaga resolusi minimal
           minHeight: 800,
         );
 
         if (result != null) {
-          // Hapus file sementara sebelumnya untuk menghemat ruang
           if (fileToCompress.path != pickedFile.path) {
-            await fileToCompress.delete();
+            await fileToCompress.delete(); // Hapus file sementara sebelumnya
           }
           fileToCompress = File(result.path);
-          print("### Kompresi dengan kualitas $currentQuality. Ukuran baru: ${await fileToCompress.length()} bytes");
         }
-
-        currentQuality -= 10;
+        currentQuality -= 10; // Turunkan kualitas untuk iterasi berikutnya
       }
 
+      // Langkah 3: Berhasil! Simpan file hasil kompresi ke state.
       buktiTransaksiFile.value = fileToCompress;
       print("### Kompresi FINAL selesai. Ukuran akhir: ${await fileToCompress.length()} bytes");
 
     } catch (e) {
       Get.snackbar("Error", "Gagal mengompres gambar: $e");
-      buktiTransaksiFile.value = null;
+      buktiTransaksiFile.value = null; // Bersihkan state jika error
     } finally {
-      isUploading.value = false;
+      isUploading.value = false; // Sembunyikan indikator loading
     }
   }
 
@@ -845,116 +895,6 @@ class LaporanKeuanganSekolahController extends GetxController with GetTickerProv
     }
   }
 
-  // Future<void> exportToPdf() async {
-  //   if (isExporting.value) return;
-  //   isExporting.value = true;
-
-  //   print("### MENJALANKAN KODE PDF DENGAN LOGIKA KOREKSI ###"); 
-
-  //   try {
-  //     // --- LANGKAH 1: PERSIAPAN ASET (TIDAK BERUBAH) ---
-  //     final infoSekolah = await _firestore.collection('Sekolah').doc(configC.idSekolah).get().then((d) => Map<String, dynamic>.from(d.data() ?? {}));
-  //     final logoBytes = await rootBundle.load('assets/png/logo.png');
-  //     final logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
-  //     final boldFont = await PdfGoogleFonts.poppinsBold();
-  //     final regularFont = await PdfGoogleFonts.poppinsRegular();
-
-  //     // --- LANGKAH 2: [UPGRADE] PRA-PEMROSESAN DATA DENGAN LOGIKA NETTING ---
-  //     final List<Map<String, dynamic>> transaksiUntukPdf = [];
-  //     final Set<String> idTransaksiKoreksi = {}; // Untuk melacak ID transaksi koreksi
-
-  //     // Iterasi pertama: temukan semua transaksi koreksi
-  //     for (var trx in daftarTransaksiTampil.value) {
-  //       if (trx['koreksiDariTrxId'] != null) {
-  //         idTransaksiKoreksi.add(trx['id']);
-  //       }
-  //     }
-
-  //     // Iterasi kedua: bangun daftar final untuk PDF
-  //     for (var trx in daftarTransaksiTampil.value) {
-  //       // Lewati transaksi ini jika ia adalah sebuah transaksi koreksi
-  //       if (idTransaksiKoreksi.contains(trx['id'])) {
-  //         continue;
-  //       }
-
-  //       // Cari apakah transaksi ini memiliki koreksi
-  //       final koreksi = daftarTransaksiTampil.value.firstWhereOrNull(
-  //         (k) => k['koreksiDariTrxId'] == trx['id']
-  //       );
-
-  //       if (koreksi != null) {
-  //         // Jika ada koreksi, buat entri virtual
-  //         final trxAsli = Map<String, dynamic>.from(trx); // Buat salinan
-  //         final jumlahLama = trxAsli['jumlah'] as int;
-  //         final jumlahKoreksi = koreksi['jumlah'] as int;
-
-  //         // Hitung efek bersih
-  //         int jumlahBenar;
-  //         if (trxAsli['jenis'] == 'Pengeluaran') {
-  //           // Pengeluaran 150rb, dikoreksi (Pemasukan) 50rb -> Efek: 100rb
-  //           jumlahBenar = jumlahLama - jumlahKoreksi;
-  //         } else { // Pemasukan
-  //           // Pemasukan 150rb, dikoreksi (Pengeluaran) 50rb -> Efek: 100rb
-  //           jumlahBenar = jumlahLama - jumlahKoreksi;
-  //         }
-
-  //         // Modifikasi entri untuk PDF
-  //         trxAsli['jumlah'] = jumlahBenar;
-  //         trxAsli['keterangan'] = "${trxAsli['keterangan']} (*dikoreksi)";
-
-  //         transaksiUntukPdf.add(trxAsli);
-
-  //       } else {
-  //         // Jika tidak ada koreksi, tambahkan transaksi seperti biasa
-  //         transaksiUntukPdf.add(trx);
-  //       }
-  //     }
-
-
-  //     // --- LANGKAH 3: RAKIT DOKUMEN PDF (MENGGUNAKAN DATA BERSIH) ---
-  //     String filterInfoText = "";
-  //     if (isFilterActive) {
-  //       List<String> filters = [];
-  //       if (filterBulanTahun.value != null) filters.add(DateFormat.yMMMM('id_ID').format(filterBulanTahun.value!));
-  //       if (filterJenis.value != null) filters.add(filterJenis.value!);
-  //       if (filterKategori.value != null) filters.add(filterKategori.value!);
-  //       filterInfoText = filters.join(" | ");
-  //     }
-
-  //     final List<pw.Widget> contentWidgets = await PdfHelperService.buildLaporanKeuanganContent(
-  //       tahunAnggaran: tahunTerpilih.value!,
-  //       summaryData: summaryData,
-  //       daftarTransaksi: transaksiUntukPdf, // [PENTING] Gunakan data yang sudah diproses
-  //       filterInfo: filterInfoText,
-  //     );
-
-  //     final pdf = pw.Document();
-  //     pdf.addPage(
-  //       pw.MultiPage(
-  //         pageFormat: PdfPageFormat.a4,
-  //         header: (context) => PdfHelperService.buildHeaderA4(
-  //           infoSekolah: infoSekolah,
-  //           logoImage: logoImage,
-  //           boldFont: boldFont,
-  //           regularFont: regularFont,
-  //         ),
-  //         footer: (context) => PdfHelperService.buildFooter(context, regularFont),
-  //         build: (context) => contentWidgets,
-  //       ),
-  //     );
-
-  //     // --- LANGKAH 4: SIMPAN & BAGIKAN (TIDAK BERUBAH) ---
-  //     final String fileName = 'laporan_keuangan_${tahunTerpilih.value}_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf';
-  //     await Printing.sharePdf(bytes: await pdf.save(), filename: fileName);
-
-  //   } catch (e) {
-  //     Get.snackbar("Error", "Gagal membuat file PDF: ${e.toString()}");
-  //     print("### PDF EXPORT ERROR: $e");
-  //   } finally {
-  //     isExporting.value = false;
-  //   }
-  // }
-
   // [FUNGSI FINAL #2] Handler utama untuk alur koreksi
   void handleKoreksi(Map<String, dynamic> trxAsli) {
     // 1. Cek Pra-kondisi di Sisi Klien
@@ -1121,20 +1061,6 @@ class LaporanKeuanganSekolahController extends GetxController with GetTickerProv
       cancel: TextButton(onPressed: Get.back, child: const Text("Batal")),
     );
   }
-
-  // Widget _buildDetailRowForDialog(String title, String value) {
-  //   return Padding(
-  //     padding: const EdgeInsets.symmetric(vertical: 4.0),
-  //     child: Row(
-  //       crossAxisAlignment: CrossAxisAlignment.start,
-  //       children: [
-  //         SizedBox(width: 90, child: Text(title, style: TextStyle(color: Colors.grey.shade600))),
-  //         const Text(": "),
-  //         Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.bold))),
-  //       ],
-  //     ),
-  //   );
-  // }
 
   // [FUNGSI BARU] Menampilkan form untuk membuat koreksi
   void showKoreksiDialog(Map<String, dynamic> trxAsli) {

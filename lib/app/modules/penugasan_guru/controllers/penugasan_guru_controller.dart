@@ -41,18 +41,21 @@ class PenugasanGuruController extends GetxController {
     final snapshot = await _firestore
         .collection('Sekolah').doc(configC.idSekolah)
         .collection('pegawai')
-        .where('role', whereIn: ['Guru Kelas', 'Guru Mapel'])
+        .where('role', whereIn: ['Guru Kelas', 'Guru Mapel', 'Kepala Sekolah'])
         .get();
         
     daftarGuru.assignAll(snapshot.docs.map((doc) {
       final data = doc.data();
       final nama = data['nama'] as String? ?? '?';
       final alias = data['alias'] as String?;
+      // Tambahkan role untuk info tambahan (opsional, untuk debugging) 
+      // final role = data['role'] as String? ?? ''; 
 
       return {
         'uid': doc.id,
         'nama': nama,
         'alias': (alias == null || alias.isEmpty) ? nama : alias,
+        //'role': role, // Jika perlu menampilkan role
       };
     }).toList());
   }

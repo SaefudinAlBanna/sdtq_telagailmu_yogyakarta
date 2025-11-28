@@ -13,10 +13,21 @@ class JurnalHarianGuruView extends GetView<JurnalHarianGuruController> {
       appBar: AppBar(
         title: const Text('Dasbor Jurnal Harian'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => controller.loadTugasHarian(),
-            tooltip: "Muat Ulang",
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: () => controller.loadTugasHarian(),
+                tooltip: "Muat Ulang",
+              ),
+              // const SizedBox(width: 3), // Spasi di sebelah kanan ikon
+              IconButton(
+                icon: const Icon(Icons.library_books_sharp),
+                onPressed: () => controller.goToJurnalPribadi(),
+                tooltip: "Info Jurnal Harian",
+              ),
+            ],
           ),
         ],
       ),

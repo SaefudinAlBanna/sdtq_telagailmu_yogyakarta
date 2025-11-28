@@ -2,7 +2,7 @@ name: sdtq_telagailmu_yogyakarta
 description: "A new Flutter project."
 
 
-version: 1.0.0+9
+version: 1.0.0+12
 
 environment:
   sdk: ^3.7.2
@@ -59,14 +59,9 @@ dev_dependencies:
     sdk: flutter
   flutter_launcher_icons: ^0.13.1
 
-flutter_launcher_icons:
-  android: "launcher_icon" # Mengaktifkan mode adaptive
+flutter_icons:
+  android: true
   ios: true
-  # Gunakan adaptive_icon_foreground untuk lapisan depan di Android
-  adaptive_icon_foreground: "assets/icon/icon.png"
-  # Tentukan warna latar belakang untuk Android
-  adaptive_icon_background: "#FFFFFF" # Ganti dengan kode hex warna brand sekolah Anda
-  # image_path digunakan untuk iOS dan sebagai fallback
   image_path: "assets/icon/icon.png"
 
   windows:

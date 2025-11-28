@@ -72,6 +72,7 @@ class ManajemenTugasController extends GetxController with GetSingleTickerProvid
       }
     } catch (e) {
       Get.snackbar("Error", "Gagal memuat daftar tugas: ${e.toString()}");
+      print("### ERROR FETCH TUGAS: $e");
     } finally {
       isLoading.value = false;
     }

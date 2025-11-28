@@ -215,6 +215,10 @@ class GuruAkademikController extends GetxController {
     );
   }
 
+  void goToJurnalHarian() {
+     Get.toNamed(Routes.JURNAL_HARIAN_GURU);
+  }
+
   void goToAbsensi() {
     Get.toNamed(Routes.ABSENSI_WALI_KELAS);
   }
