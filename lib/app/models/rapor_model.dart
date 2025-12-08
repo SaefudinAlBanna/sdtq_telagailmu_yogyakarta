@@ -22,6 +22,7 @@ class RaporModel {
   final RekapAbsensi rekapAbsensi;
   final String catatanWaliKelas;
   final bool isShared;
+  final double nilaiRataRata;
 
   RaporModel({
     required this.id, required this.idSekolah, required this.idTahunAjaran,
@@ -31,6 +32,7 @@ class RaporModel {
     required this.daftarNilaiMapel,
     required this.dataHalaqah, required this.daftarEkskul, required this.rekapAbsensi,
     required this.catatanWaliKelas, this.isShared = false,
+    this.nilaiRataRata = 0.0, 
   });
   
   RaporModel copyWith({bool? isShared}) {
@@ -42,6 +44,7 @@ class RaporModel {
       daftarNilaiMapel: daftarNilaiMapel, dataHalaqah: dataHalaqah,
       daftarEkskul: daftarEkskul, rekapAbsensi: rekapAbsensi,
       catatanWaliKelas: catatanWaliKelas, isShared: isShared ?? this.isShared,
+      nilaiRataRata: nilaiRataRata,
     );
   }
 
@@ -58,6 +61,7 @@ class RaporModel {
       'daftarEkskul': daftarEkskul.map((e) => e.toJson()).toList(),
       'rekapAbsensi': rekapAbsensi.toJson(),
       'catatanWaliKelas': catatanWaliKelas, 'isShared': isShared,
+      'nilaiRataRata': nilaiRataRata,
     };
   }
 
@@ -86,6 +90,7 @@ class RaporModel {
       rekapAbsensi: RekapAbsensi.fromJson(data['rekapAbsensi'] as Map<String, dynamic>? ?? {}),
       catatanWaliKelas: data['catatanWaliKelas'] ?? '',
       isShared: data['isShared'] ?? false,
+      nilaiRataRata: (data['nilaiRataRata'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }

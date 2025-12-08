@@ -372,25 +372,57 @@ class RaporSiswaView extends GetView<RaporSiswaController> {
             Text("D. Catatan Wali Kelas", style: Get.textTheme.titleLarge),
             const Divider(),
             const SizedBox(height: 8),
-            Text(rapor.catatanWaliKelas),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: const [
-                Text("Wali Kelas,"),
-                Text("Orang Tua/Wali,"),
-              ],
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8)
+              ),
+              child: Text(
+                rapor.catatanWaliKelas.isEmpty ? "-" : rapor.catatanWaliKelas,
+                style: const TextStyle(fontStyle: FontStyle.italic),
+              ),
             ),
-            const SizedBox(height: 64),
+            const SizedBox(height: 32),
+            
+            // --- TANDA TANGAN UI (Segitiga Terbalik) ---
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Ambil nama Wali Kelas dari model rapor
-                Text("(${rapor.namaWaliKelas})", style: const TextStyle(fontWeight: FontWeight.bold)),
-
-                // [PERBAIKAN KUNCI] Ambil nama Orang Tua dari model rapor
-                Text("(${rapor.namaOrangTua})", style: const TextStyle(fontWeight: FontWeight.bold)),
+                // KIRI: Orang Tua
+                Column(
+                  children: [
+                    const Text("Mengetahui,"),
+                    const Text("Orang Tua/Wali"),
+                    const SizedBox(height: 50),
+                    Text("(${rapor.namaOrangTua})", style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                // KANAN: Wali Kelas
+                Column(
+                  children: [
+                    Text("Yogyakarta, ${DateFormat('dd MMM yyyy', 'id_ID').format(rapor.tanggalGenerate)}"),
+                    const Text("Wali Kelas"),
+                    const SizedBox(height: 50),
+                    Text("(${rapor.namaWaliKelas})", style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ],
+                ),
               ],
+            ),
+            const SizedBox(height: 40), // Jarak ke bawah
+            // TENGAH BAWAH: Kepala Sekolah
+            Center(
+              child: Column(
+                children: [
+                  const Text("Mengetahui,"),
+                  const Text("Kepala Sekolah"),
+                  const SizedBox(height: 50),
+                  // Ambil dari controller agar dinamis
+                  Text("(${controller.namaKepalaSekolah.value})", style: const TextStyle(fontWeight: FontWeight.bold)),
+                ],
+              ),
             ),
           ],
         ),

@@ -4,6 +4,7 @@ class SiswaLaporanModel {
   final String uid;
   final String nama;
   final String nisn;
+  final String? fotoProfilUrl;
   
   // Metrik-metrik baru yang lebih kaya sesuai blueprint
   double nilaiAkhirRapor;
@@ -15,6 +16,7 @@ class SiswaLaporanModel {
     required this.uid,
     required this.nama,
     required this.nisn,
+    this.fotoProfilUrl,
     // Inisialisasi dengan nilai default
     this.nilaiAkhirRapor = 0.0,
     this.rataRataAbsensiKelas = 0.0,

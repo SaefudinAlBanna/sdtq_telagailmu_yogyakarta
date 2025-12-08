@@ -170,14 +170,15 @@ class PdfHelperService {
     );
   }
 
-  // =======================================================================
-  // [FUNGSI BARU] UNTUK MEMBANGUN KONTEN RAPOR DIGITAL
+  /// =======================================================================
+  // 1. KONTEN ISI RAPOR (Tanpa Tanda Tangan)
   // =======================================================================
   static Future<List<pw.Widget>> buildRaporDigitalContent({
     required RaporModel rapor,
     required pw.Font regularFont,
     required pw.Font boldFont,
     required pw.Font italicFont,
+    // Note: Parameter namaKepalaSekolah dihapus dari sini karena dipindah ke Footer
   }) async {
     final widgets = <pw.Widget>[];
   
@@ -260,7 +261,7 @@ class PdfHelperService {
       // Bagian C: Ketidakhadiran
       pw.Text("C. Ketidakhadiran", style: pw.TextStyle(font: boldFont, fontSize: 12)),
       pw.Container(
-        width: 250, // Batasi lebar tabel absensi agar tidak terlalu besar
+        width: 250, 
         child: pw.Table(
           border: pw.TableBorder.all(),
           children: [
@@ -271,7 +272,7 @@ class PdfHelperService {
         ),
       ),
       pw.SizedBox(height: 16),
-      // Bagian D: Catatan Wali Kelas (Sekarang di bawah C)
+      // Bagian D: Catatan Wali Kelas
       pw.Text("D. Catatan Wali Kelas", style: pw.TextStyle(font: boldFont, fontSize: 12)),
       pw.Container(
         width: double.infinity,
@@ -282,30 +283,97 @@ class PdfHelperService {
     ]
   ));
   
-    // --- Bagian Tanda Tangan ---
-    widgets.add(pw.SizedBox(height: 40));
-    widgets.add(pw.Spacer());
-    widgets.add(pw.Row(
-      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-      children: [
-        pw.Column(children: [
-          pw.Text("Mengetahui,"),
-          pw.Text("Orang Tua/Wali"),
-          pw.SizedBox(height: 60),
-          // [MODIFIKASI] Ambil nama dari RaporModel
-          pw.Text("( ${rapor.namaOrangTua} )", style: pw.TextStyle(font: boldFont)),
-        ]),
-        pw.Column(children: [
-          pw.Text("Yogyakarta, ${DateFormat('dd MMMM yyyy', 'id_ID').format(rapor.tanggalGenerate)}"),
-          pw.Text("Wali Kelas"),
-          pw.SizedBox(height: 60),
-          // [MODIFIKASI] Ambil nama dari RaporModel
-          pw.Text("( ${rapor.namaWaliKelas} )", style: pw.TextStyle(font: boldFont)),
-        ]),
-      ]
-    ));
-
+    // [PENTING] Bagian Tanda Tangan DIHAPUS dari sini karena akan dipindah ke Footer
+    
     return widgets;
+  }
+
+  // =======================================================================
+  // 2. HELPER FOOTER TANDA TANGAN (POSISI BAWAH & SEGITIGA TERBALIK)
+  // =======================================================================
+  static pw.Widget buildSignatureFooter({
+    required RaporModel rapor,
+    required String namaKepalaSekolah,
+    required pw.Font regularFont,
+    required pw.Font boldFont,
+  }) {
+    return pw.Column(
+      mainAxisSize: pw.MainAxisSize.min,
+      children: [
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            // KIRI: ORANG TUA
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                pw.Text("Mengetahui,", style: pw.TextStyle(font: regularFont, fontSize: 10)),
+                pw.Text("Orang Tua/Wali", style: pw.TextStyle(font: regularFont, fontSize: 10)),
+                pw.SizedBox(height: 50),
+                pw.Container(
+                  width: 180,
+                  // [REVISI] Decoration/Border dihapus agar tidak ada garis bawah
+                  // decoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(width: 1))),
+                  child: pw.Center(
+                    child: pw.Text(
+                      "(${rapor.namaOrangTua})", 
+                      style: pw.TextStyle(font: boldFont, fontSize: 10),
+                      maxLines: 1,
+                      overflow: pw.TextOverflow.clip,
+                    ),
+                  ),
+                ),
+              ]
+            ),
+            // KANAN: WALI KELAS
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                pw.Text("Yogyakarta, ${DateFormat('dd MMMM yyyy', 'id_ID').format(rapor.tanggalGenerate)}", style: pw.TextStyle(font: regularFont, fontSize: 10)),
+                pw.Text("Wali Kelas", style: pw.TextStyle(font: regularFont, fontSize: 10)),
+                pw.SizedBox(height: 50),
+                pw.Container(
+                  width: 180,
+                  // [REVISI] Decoration/Border dihapus
+                  child: pw.Center(
+                    child: pw.Text(
+                      "(${rapor.namaWaliKelas})", 
+                      style: pw.TextStyle(font: boldFont, fontSize: 10),
+                      maxLines: 1, 
+                      overflow: pw.TextOverflow.clip,
+                    ),
+                  ),
+                ),
+              ]
+            ),
+          ]
+        ),
+        
+        pw.SizedBox(height: 25),
+
+        // TENGAH: KEPALA SEKOLAH
+        pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.center,
+          children: [
+            pw.Text("Mengetahui,", style: pw.TextStyle(font: regularFont, fontSize: 10)),
+            pw.Text("Kepala Sekolah", style: pw.TextStyle(font: regularFont, fontSize: 10)),
+            pw.SizedBox(height: 50),
+            pw.Container(
+              width: 200,
+              // [REVISI] Decoration/Border dihapus
+              child: pw.Center(
+                child: pw.Text(
+                  "( $namaKepalaSekolah )", 
+                  style: pw.TextStyle(font: boldFont, fontSize: 10),
+                  maxLines: 1, 
+                  overflow: pw.TextOverflow.clip,
+                ),
+              ),
+            ),
+          ]
+        ),
+      ]
+    );
   }
   
   // Helper untuk tabel absensi
@@ -384,77 +452,6 @@ class PdfHelperService {
         ]
       );
   }
-
-  // =======================================================================
-  // FUNGSI BARU UNTUK LAPORAN HALAQAH
-  // =======================================================================
-  // static Future<pw.Widget> buildHalaqahDashboardContent({
-  //   required List<AgregatProgres> dataAgregat,
-  //   required List<SiswaDashboardModel> siswaTanpaGrup,
-  //   required List<SiswaDashboardModel> siswaProgresLambat,
-  //   required List<SiswaDashboardModel> semuaSiswaDiFilter, // [BARU] Terima semua data siswa
-  // }) async {
-  //   final font = await PdfGoogleFonts.poppinsRegular();
-  //   final boldFont = await PdfGoogleFonts.poppinsBold();
-
-  //   final tables = <pw.Widget>[];
-
-  //   // --- BAGIAN 1: TABEL DISTRIBUSI PROGRES (DETAIL) ---
-  //   tables.add(pw.Text("Distribusi Progres Siswa", style: pw.TextStyle(font: boldFont, fontSize: 14)));
-  //   tables.add(pw.SizedBox(height: 10));
-
-  //   // Iterasi setiap tingkat progresi
-  //   for (var agregat in dataAgregat) {
-  //     // Filter siswa yang berada di tingkat progresi ini
-  //     final siswaDiTingkatIni = semuaSiswaDiFilter
-  //         .where((s) => "${s.progresTingkat} ${s.progresDetail}" == agregat.tingkat)
-  //         .toList();
-
-  //     // Buat tabel detail untuk tingkat ini
-  //     tables.add(buildHalaqahPdfTable(
-  //       title: "${agregat.tingkat} (${agregat.jumlahSiswa} Siswa)",
-  //       headers: ['No', 'Nama Siswa', 'Kelas', 'Pengampu'],
-  //       data: siswaDiTingkatIni.asMap().entries.map((e) => [
-  //         (e.key + 1).toString(),
-  //         e.value.nama,
-  //         e.value.kelasId.split('-').first,
-  //         e.value.namaPengampu,
-  //       ]).toList(),
-  //       font: font,
-  //       boldFont: boldFont,
-  //     ));
-  //   }
-
-  //   // --- BAGIAN 2 & 3: SISWA TANPA GRUP & PROGRES LAMBAT ---
-  //   if (siswaTanpaGrup.isNotEmpty) {
-  //     tables.add(buildHalaqahPdfTable(
-  //       title: "Siswa Tanpa Grup (${siswaTanpaGrup.length} Siswa)",
-  //       headers: ['No', 'Nama Siswa', 'Kelas'],
-  //       data: siswaTanpaGrup.asMap().entries.map((e) => [(e.key + 1).toString(), e.value.nama, e.value.kelasId.split('-').first]).toList(),
-  //       font: font, boldFont: boldFont,
-  //     ));
-  //   }
-    
-  //   if (siswaProgresLambat.isNotEmpty) {
-  //      tables.add(buildHalaqahPdfTable(
-  //       title: "Siswa Progres Lambat (${siswaProgresLambat.length} Siswa)",
-  //       headers: ['No', 'Nama Siswa', 'Kelas', 'Pengampu', 'Setoran Terakhir'],
-  //       data: siswaProgresLambat.asMap().entries.map((e) {
-  //         final siswa = e.value;
-  //         return [
-  //           (e.key + 1).toString(),
-  //           siswa.nama,
-  //           siswa.kelasId.split('-').first,
-  //           siswa.namaPengampu,
-  //           siswa.tanggalSetoranTerakhir != null ? DateFormat('dd MMM yyyy').format(siswa.tanggalSetoranTerakhir!.toDate()) : 'N/A',
-  //         ];
-  //       }).toList(),
-  //       font: font, boldFont: boldFont,
-  //     ));
-  //   }
-
-  //   return pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: tables);
-  // }
   
   // Helper untuk buildHalaqahDashboardContent
   static pw.Widget buildHalaqahPdfTable({

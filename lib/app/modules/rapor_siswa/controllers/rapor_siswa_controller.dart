@@ -26,6 +26,8 @@ class RaporSiswaController extends GetxController {
   final RxBool isSharing = false.obs;
   final RxBool isUpdating = false.obs;
 
+  final RxString namaKepalaSekolah = ".........................".obs;
+
   late SiswaModel siswa;
   late String kelasId, semesterId, tahunAjaranId;
 
@@ -33,6 +35,7 @@ class RaporSiswaController extends GetxController {
   void onInit() {
     super.onInit();
     _initializeData();
+    _fetchInfoSekolah(); // Panggil di init
   }
   
   void _initializeData() {
@@ -56,6 +59,20 @@ class RaporSiswaController extends GetxController {
       isLoading.value = false;
     }
   }
+
+  Future<void> _fetchInfoSekolah() async {
+    try {
+      final doc = await _firestore.collection('Sekolah').doc(configC.idSekolah).get();
+      final data = doc.data();
+      if (data != null) {
+        // Update value .obs
+        namaKepalaSekolah.value = data['kepalasekolah'] ?? "Kepala Sekolah";
+      }
+    } catch (e) {
+      print("Error fetch info sekolah: $e");
+    }
+  }
+
 
   void confirmAndUpdateRapor() {
     Get.defaultDialog(
@@ -123,6 +140,9 @@ class RaporSiswaController extends GetxController {
  Future<void> generateRapor() async {
     isGenerating.value = true;
     try {
+      // 1. Ambil Info Sekolah dulu agar nama KS update
+      await _fetchInfoSekolah();
+
       final results = await Future.wait([
         _fetchNilaiAkademik(),
         _fetchRekapAbsensi(),
@@ -137,6 +157,16 @@ class RaporSiswaController extends GetxController {
       final String catatanWalas = results[3] as String;
       final DataHalaqahRapor dataHalaqah = dataPengembangan['halaqah'] as DataHalaqahRapor;
       final List<DataEkskulRapor> daftarEkskul = dataPengembangan['ekskul'] as List<DataEkskulRapor>;
+
+      double totalNilai = 0;
+      int jumlahMapel = 0;
+      for (var n in daftarNilai) {
+        if (n.nilaiAkhir > 0) {
+          totalNilai += n.nilaiAkhir;
+          jumlahMapel++;
+        }
+      }
+      double rataRata = jumlahMapel > 0 ? (totalNilai / jumlahMapel) : 0.0;
 
       final RaporModel hasilRapor = RaporModel(
         id: '${siswa.uid}_$semesterId',
@@ -157,11 +187,12 @@ class RaporSiswaController extends GetxController {
         rekapAbsensi: rekapAbsensi,
         // catatanWaliKelas: "Terus tingkatkan semangat belajar ya sholih-sholihah, dan jangan ragu untuk bertanya.",
         catatanWaliKelas: catatanWalas,
+        nilaiRataRata: rataRata,
       );
       
       await _saveRaporToFirestore(hasilRapor);
-      raporData.value = hasilRapor;
-      Get.snackbar("Berhasil", "Rapor digital untuk ${siswa.namaLengkap} berhasil digenerate.");
+      raporData.value = hasilRapor; // Update state UI
+      Get.snackbar("Berhasil", "Rapor berhasil digenerate.");
       
     } catch (e) {
       Get.snackbar("Error", "Gagal membuat rapor: ${e.toString()}");
@@ -317,7 +348,7 @@ class RaporSiswaController extends GetxController {
     try {
       final doc = pw.Document();
       
-      // 1. Muat semua aset yang dibutuhkan
+      // 1. Muat semua aset (Font & Gambar)
       final boldFont = await PdfGoogleFonts.poppinsBold();
       final regularFont = await PdfGoogleFonts.poppinsRegular();
       final italicFont = await PdfGoogleFonts.poppinsItalic();
@@ -327,29 +358,60 @@ class RaporSiswaController extends GetxController {
       final infoSekolahDoc = await _firestore.collection('Sekolah').doc(configC.idSekolah).get();
       final infoSekolah = infoSekolahDoc.data() ?? {};
       
-      // 3. Panggil service untuk membangun konten rapor
-      final content = await PdfHelperService.buildRaporDigitalContent(
+      // 3. Pastikan nama Kepala Sekolah sudah terambil (Safety Check)
+      if (namaKepalaSekolah.value == ".........................") {
+         await _fetchInfoSekolah();
+      }
+
+      // 4. Ambil Widget Konten (Tabel Nilai, dll) - TANPA TANDA TANGAN
+      final contentWidgets = await PdfHelperService.buildRaporDigitalContent(
         rapor: raporData.value!,
         regularFont: regularFont,
         boldFont: boldFont,
         italicFont: italicFont,
       );
 
-      // 4. Rakit dokumen PDF
+      // 5. Rakit Dokumen PDF dengan FOOTER SPESIAL
       doc.addPage(
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.all(32),
+          
+          // HEADER: Muncul di setiap halaman
           header: (context) => PdfHelperService.buildHeaderA4(
             infoSekolah: infoSekolah, logoImage: logoImage, 
             boldFont: boldFont, regularFont: regularFont
           ),
-          footer: (context) => PdfHelperService.buildFooter(context, regularFont),
-          build: (context) => content,
+          
+          // FOOTER: Logika "Tanda Tangan Paling Bawah"
+          footer: (context) {
+            return pw.Column(
+              mainAxisSize: pw.MainAxisSize.min, // Agar tidak memakan space kosong
+              children: [
+                // LOGIKA: Jika ini halaman terakhir, tampilkan Tanda Tangan
+                if (context.pageNumber == context.pagesCount) ...[
+                   pw.SizedBox(height: 30), // Spasi pemisah dari konten rapor
+                   PdfHelperService.buildSignatureFooter(
+                     rapor: raporData.value!,
+                     namaKepalaSekolah: namaKepalaSekolah.value, // Ambil dari .obs
+                     regularFont: regularFont,
+                     boldFont: boldFont,
+                   ),
+                   pw.SizedBox(height: 20), // Spasi kecil ke nomor halaman
+                ],
+                
+                // Nomor Halaman (Muncul di semua halaman)
+                PdfHelperService.buildFooter(context, regularFont),
+              ]
+            );
+          },
+          
+          // KONTEN UTAMA
+          build: (context) => contentWidgets,
         ),
       );
 
-      // 5. Bagikan atau simpan PDF
+      // 6. Bagikan PDF
       await Printing.sharePdf(
         bytes: await doc.save(),
         filename: 'rapor_${raporData.value!.namaSiswa}_${raporData.value!.idTahunAjaran}.pdf'
@@ -357,6 +419,7 @@ class RaporSiswaController extends GetxController {
 
     } catch (e) {
       Get.snackbar("Error", "Gagal membuat PDF: $e");
+      print("PDF ERROR: $e");
     } finally {
       isPrinting.value = false;
     }

@@ -82,28 +82,30 @@ class GuruAkademikView extends GetView<GuruAkademikController> {
   // --- [BARU] Widget untuk menampilkan tombol khusus Wali Kelas ---
   Widget _buildWaliKelasActions() {
     return Obx(() {
-      // Tampilkan hanya jika guru ini adalah wali kelas DARI kelas yang sedang dipilih
-      if (controller.isWaliKelas.value && controller.kelasDiampuId.value == controller.kelasTerpilihId.value) {
+      // Gunakan getter 'amIWaliKelasHere' yang sudah kita buat
+      if (controller.amIWaliKelasHere) {
         return Container(
           color: Colors.blue.shade50,
+          padding: const EdgeInsets.symmetric(vertical: 4),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               TextButton.icon(
-                icon: const Icon(Icons.fact_check_outlined),
-                label: const Text("Absensi Harian"),
+                icon: const Icon(Icons.fact_check_outlined, color: Colors.blue),
+                label: const Text("Absensi Harian", style: TextStyle(color: Colors.blue)),
                 onPressed: controller.goToAbsensi,
               ),
+              Container(width: 1, height: 20, color: Colors.grey.shade300), // Divider kecil
               TextButton.icon(
-                icon: const Icon(Icons.bar_chart_rounded),
-                label: const Text("Rekap Absensi"),
+                icon: const Icon(Icons.bar_chart_rounded, color: Colors.blue),
+                label: const Text("Rekap Absensi", style: TextStyle(color: Colors.blue)),
                 onPressed: controller.goToRekapAbsensiKelas,
               ),
             ],
           ),
         );
       }
-      return const SizedBox.shrink(); // Sembunyikan jika bukan wali kelas dari kelas ini
+      return const SizedBox.shrink(); 
     });
   }
 

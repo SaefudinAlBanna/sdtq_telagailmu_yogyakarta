@@ -27,10 +27,24 @@ class DaftarSiswaPermapelView extends GetView<DaftarSiswaPermapelController> {
           ),
         Obx(() {
             if (controller.isWaliKelas.value) {
-              return IconButton(
-                icon: const Icon(Icons.edit_document),
-                tooltip: "Tulis Catatan Rapor untuk Siswa",
-                onPressed: controller.showCatatanRaporDialog,
+              return Row( // Bungkus dengan Row
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.leaderboard_rounded, color: Colors.grey[800]), // Ikon Ranking
+                    tooltip: "Evaluasi & Peringkat Kelas",
+                    onPressed: controller.showRankingDialog,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit_document),
+                    tooltip: "Tulis Catatan Rapor",
+                    onPressed: controller.showCatatanRaporDialog,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.sync_rounded),
+                    tooltip: "Generate Massal (Ranking)",
+                    onPressed: controller.confirmGenerateMassal,
+                  ),
+                ],
               );
             }
             return const SizedBox.shrink();
