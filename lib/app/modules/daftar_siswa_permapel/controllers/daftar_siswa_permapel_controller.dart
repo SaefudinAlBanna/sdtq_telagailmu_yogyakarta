@@ -16,6 +16,10 @@ class DaftarSiswaPermapelController extends GetxController {
   late String idKelas, idMapel, namaMapel, idGuru, namaGuru;
   late bool isPengganti;
 
+  // Map untuk menyimpan controller text field: {'uid_siswa': {'s': Ctrl, 'i': Ctrl, 'a': Ctrl}}
+  final absensiControllers = <String, Map<String, TextEditingController>>{}.obs;
+  final isLoadingAbsensi = false.obs;
+
   // --- FITUR EVALUASI & RANKING ---
   final RxList<Map<String, dynamic>> dataRanking = <Map<String, dynamic>>[].obs;
   final isRankingLoading = false.obs;
@@ -697,5 +701,207 @@ class DaftarSiswaPermapelController extends GetxController {
       // Jangan update 'tanggalGenerate' agar walas tau kapan terakhir generate FULL
       'lastRankingUpdate': FieldValue.serverTimestamp(), 
     }, SetOptions(merge: true));
+  }
+
+
+
+
+  // --- FITUR INPUT ABSENSI DADAKAN (MANUAL MASSAL) ---
+
+  void showInputAbsensiMassalDialog() async {
+    isLoadingAbsensi.value = true;
+    
+    // 1. Inisialisasi Controller & Load Data Lama
+    await _prepareAbsensiControllers();
+    isLoadingAbsensi.value = false;
+
+    Get.dialog(
+      Scaffold( // Gunakan Scaffold agar ada Appbar di Dialog full screen/large
+        appBar: AppBar(
+          title: const Text("Input Absensi Massal (Manual)"),
+          actions: [
+            Obx(() => TextButton(
+              onPressed: isLoadingAbsensi.value ? null : _simpanAbsensiMassal,
+              child: isLoadingAbsensi.value 
+                ? const CircularProgressIndicator(color: Colors.white) 
+                : const Text("SIMPAN SEMUA", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
+            ))
+          ],
+        ),
+        body: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              color: Colors.amber.shade100,
+              child: const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                  SizedBox(width: 8),
+                  Expanded(child: Text("Fitur ini akan MENIMPA data hitungan otomatis absensi harian. Gunakan hanya jika diperlukan.", style: TextStyle(fontSize: 12))),
+                ],
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(flex: 4, child: Text("Nama Siswa", style: TextStyle(fontWeight: FontWeight.bold))),
+                  Expanded(flex: 1, child: Center(child: Text("S", style: TextStyle(fontWeight: FontWeight.bold)))),
+                  SizedBox(width: 8),
+                  Expanded(flex: 1, child: Center(child: Text("I", style: TextStyle(fontWeight: FontWeight.bold)))),
+                  SizedBox(width: 8),
+                  Expanded(flex: 1, child: Center(child: Text("A", style: TextStyle(fontWeight: FontWeight.bold)))),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: Obx(() {
+                if (isLoadingAbsensi.value) return const Center(child: CircularProgressIndicator());
+                
+                return ListView.separated(
+                  itemCount: daftarSiswa.length,
+                  separatorBuilder: (ctx, i) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final siswa = daftarSiswa[index];
+                    final ctrls = absensiControllers[siswa.uid];
+                    
+                    if (ctrls == null) return const SizedBox.shrink();
+
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 4, 
+                            child: Text(siswa.namaLengkap, style: const TextStyle(fontSize: 13))
+                          ),
+                          _buildAbsenField(ctrls['s']!, Colors.orange.shade50),
+                          const SizedBox(width: 8),
+                          _buildAbsenField(ctrls['i']!, Colors.blue.shade50),
+                          const SizedBox(width: 8),
+                          _buildAbsenField(ctrls['a']!, Colors.red.shade50),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              }),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAbsenField(TextEditingController ctrl, Color color) {
+    return Expanded(
+      flex: 1,
+      child: Container(
+        height: 40,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: Colors.grey.shade300)
+        ),
+        child: TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.number,
+          textAlign: TextAlign.center,
+          decoration: const InputDecoration(
+            border: InputBorder.none,
+            contentPadding: EdgeInsets.only(bottom: 8), // Adjust vertical align
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _prepareAbsensiControllers() async {
+    final semester = configC.semesterAktif.value;
+    final tahun = configC.tahunAjaranAktif.value;
+
+    // Ambil data yang sudah ada (Batch Get)
+    // Sebaiknya optimalkan dengan logic chunk jika siswa > 30, tapi untuk sekarang simple loop dulu
+    // atau fetch collection daftarsiswa dan subcollection semester (agak kompleks).
+    
+    // Kita lakukan loop fetch sederhana (atau gunakan data ranking jika sudah ada)
+    // Demi akurasi, kita fetch doc semester per siswa.
+    
+    for (var siswa in daftarSiswa) {
+      // Init controller kosong dulu
+      absensiControllers[siswa.uid] = {
+        's': TextEditingController(text: '0'),
+        'i': TextEditingController(text: '0'),
+        'a': TextEditingController(text: '0'),
+      };
+    }
+
+    try {
+      // Fetch Paralel untuk mengisi data lama
+      await Future.wait(daftarSiswa.map((siswa) async {
+        final doc = await _firestore
+            .collection('Sekolah').doc(configC.idSekolah)
+            .collection('tahunajaran').doc(tahun)
+            .collection('kelastahunajaran').doc(idKelas)
+            .collection('daftarsiswa').doc(siswa.uid)
+            .collection('semester').doc(semester)
+            .get();
+        
+        if (doc.exists) {
+          final data = doc.data()?['rekapAbsensiManual'];
+          if (data != null) {
+            absensiControllers[siswa.uid]?['s']?.text = data['sakit']?.toString() ?? '0';
+            absensiControllers[siswa.uid]?['i']?.text = data['izin']?.toString() ?? '0';
+            absensiControllers[siswa.uid]?['a']?.text = data['alfa']?.toString() ?? '0';
+          }
+        }
+      }));
+    } catch (e) {
+      print("Error loading absensi manual: $e");
+    }
+  }
+
+  Future<void> _simpanAbsensiMassal() async {
+    isLoadingAbsensi.value = true;
+    final batch = _firestore.batch();
+    final semester = configC.semesterAktif.value;
+    final tahun = configC.tahunAjaranAktif.value;
+
+    try {
+      for (var siswa in daftarSiswa) {
+        final ctrls = absensiControllers[siswa.uid];
+        if (ctrls == null) continue;
+
+        int s = int.tryParse(ctrls['s']!.text) ?? 0;
+        int i = int.tryParse(ctrls['i']!.text) ?? 0;
+        int a = int.tryParse(ctrls['a']!.text) ?? 0;
+
+        final docRef = _firestore
+            .collection('Sekolah').doc(configC.idSekolah)
+            .collection('tahunajaran').doc(tahun)
+            .collection('kelastahunajaran').doc(idKelas)
+            .collection('daftarsiswa').doc(siswa.uid)
+            .collection('semester').doc(semester);
+
+        batch.set(docRef, {
+          'rekapAbsensiManual': {
+            'sakit': s,
+            'izin': i,
+            'alfa': a,
+            'updatedAt': Timestamp.now(),
+          }
+        }, SetOptions(merge: true));
+      }
+
+      await batch.commit();
+      Get.back(); // Tutup Dialog
+      Get.snackbar("Sukses", "Data absensi manual berhasil disimpan.");
+      
+    } catch (e) {
+      Get.snackbar("Error", "Gagal menyimpan: $e");
+    } finally {
+      isLoadingAbsensi.value = false;
+    }
   }
 }

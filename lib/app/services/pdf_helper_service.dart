@@ -178,6 +178,7 @@ class PdfHelperService {
     required pw.Font regularFont,
     required pw.Font boldFont,
     required pw.Font italicFont,
+    required pw.Font arabicFont,
     // Note: Parameter namaKepalaSekolah dihapus dari sini karena dipindah ke Footer
   }) async {
     final widgets = <pw.Widget>[];
@@ -218,7 +219,19 @@ class PdfHelperService {
             pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(index.toString(), textAlign: pw.TextAlign.center)),
             pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(nilai.namaMapel)),
             pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(nilai.nilaiAkhir.toStringAsFixed(1), textAlign: pw.TextAlign.center)),
-            pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(nilai.deskripsiCapaian, style: const pw.TextStyle(fontSize: 9))),
+            
+            // [REVISI PENTING] Tambahkan fontFallback untuk Deskripsi Capaian
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(4), 
+              child: pw.Text(
+                nilai.deskripsiCapaian, 
+                style: pw.TextStyle(
+                  fontSize: 9, 
+                  font: regularFont, // Font Utama (Latin)
+                  fontFallback: [arabicFont], // [BARU] Fallback ke Font Arab jika ketemu huruf arab
+                )
+              )
+            ),
           ]);
         }),
       ],
@@ -242,7 +255,19 @@ class PdfHelperService {
         pw.TableRow(children: [
           pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text("Halaqah")),
           pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text(rapor.dataHalaqah.nilaiAkhir?.toString() ?? '-', textAlign: pw.TextAlign.center)),
-          pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text("Tingkat: ${rapor.dataHalaqah.tingkatan}.\n${rapor.dataHalaqah.catatan}", style: const pw.TextStyle(fontSize: 9))),
+          
+          // [REVISI PENTING] Tambahkan fontFallback untuk Catatan Halaqah
+          pw.Padding(
+            padding: const pw.EdgeInsets.all(4), 
+            child: pw.Text(
+              "Tingkat: ${rapor.dataHalaqah.tingkatan}.\n${rapor.dataHalaqah.catatan}", 
+              style: pw.TextStyle(
+                fontSize: 9,
+                font: regularFont,
+                fontFallback: [arabicFont] // [BARU] Antisipasi arab di catatan halaqah
+              )
+            )
+          ),
         ]),
         // Ekskul
         ...rapor.daftarEkskul.map((ekskul) => pw.TableRow(children: [

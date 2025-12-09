@@ -252,25 +252,54 @@ class RaporSiswaController extends GetxController {
   }
 
   Future<RekapAbsensi> _fetchRekapAbsensi() async {
-    // 1. Controller ini menunjuk ke path yang SANGAT SPESIFIK:
+    // 1. Cek dulu apakah ada DATA MANUAL di dokumen semester siswa
+    try {
+      final semesterDocRef = _firestore
+          .collection('Sekolah').doc(configC.idSekolah)
+          .collection('tahunajaran').doc(tahunAjaranId)
+          .collection('kelastahunajaran').doc(kelasId)
+          .collection('daftarsiswa').doc(siswa.uid)
+          .collection('semester').doc(semesterId);
+      
+      final semesterDoc = await semesterDocRef.get();
+      
+      if (semesterDoc.exists) {
+        final manualData = semesterDoc.data()?['rekapAbsensiManual'];
+        
+        // [LOGIKA PRIORITAS] Jika ada data manual, pakai itu!
+        if (manualData != null) {
+          print("Menggunakan Data Absensi Manual untuk ${siswa.namaLengkap}");
+          return RekapAbsensi(
+            sakit: (manualData['sakit'] as num?)?.toInt() ?? 0,
+            izin: (manualData['izin'] as num?)?.toInt() ?? 0,
+            alpa: (manualData['alfa'] as num?)?.toInt() ?? 0, // Perhatikan key 'alfa' vs 'alpa'
+          );
+        }
+      }
+    } catch (e) {
+      print("Warning: Gagal cek absensi manual, lanjut ke auto.");
+    }
+
+    // 2. Jika tidak ada manual, jalankan LOGIKA LAMA (Hitung dokumen harian)
+    // ... (Kode lama Anda yang hitung loop dokumen absensi_siswa) ...
+    
     final snapshot = await _firestore
         .collection('Sekolah').doc(configC.idSekolah)
         .collection('tahunajaran').doc(tahunAjaranId)
         .collection('kelastahunajaran').doc(kelasId)
-        .collection('daftarsiswa').doc(siswa.uid) // <-- Hanya untuk siswa ini
+        .collection('daftarsiswa').doc(siswa.uid)
         .collection('semester').doc(semesterId)
-        .collection('absensi_siswa') // <-- Koleksi absensi individual
+        .collection('absensi_siswa')
         .get();
 
     if (snapshot.docs.isEmpty) return RekapAbsensi(sakit: 0, izin: 0, alpa: 0);
 
-    // 2. Ia lalu menghitung total S, I, A dari semua dokumen di koleksi tersebut.
     int sakit = 0, izin = 0, alpa = 0;
     for (var doc in snapshot.docs) {
       final status = doc.data()['status'] as String?;
       if (status == 'Sakit') sakit++;
       else if (status == 'Izin') izin++;
-      else if (status == 'Alpa') alpa++;
+      else if (status == 'Alpa' || status == 'Alfa') alpa++;
     }
 
     return RekapAbsensi(sakit: sakit, izin: izin, alpa: alpa);
@@ -352,6 +381,7 @@ class RaporSiswaController extends GetxController {
       final boldFont = await PdfGoogleFonts.poppinsBold();
       final regularFont = await PdfGoogleFonts.poppinsRegular();
       final italicFont = await PdfGoogleFonts.poppinsItalic();
+      final arabicFont = await PdfGoogleFonts.amiriRegular();
       final logoImage = pw.MemoryImage((await rootBundle.load('assets/png/logo.png')).buffer.asUint8List());
       
       // 2. Ambil data info sekolah
@@ -369,6 +399,7 @@ class RaporSiswaController extends GetxController {
         regularFont: regularFont,
         boldFont: boldFont,
         italicFont: italicFont,
+        arabicFont: arabicFont,
       );
 
       // 5. Rakit Dokumen PDF dengan FOOTER SPESIAL
@@ -377,36 +408,32 @@ class RaporSiswaController extends GetxController {
           pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.all(32),
           
-          // HEADER: Muncul di setiap halaman
           header: (context) => PdfHelperService.buildHeaderA4(
             infoSekolah: infoSekolah, logoImage: logoImage, 
             boldFont: boldFont, regularFont: regularFont
           ),
           
-          // FOOTER: Logika "Tanda Tangan Paling Bawah"
           footer: (context) {
             return pw.Column(
-              mainAxisSize: pw.MainAxisSize.min, // Agar tidak memakan space kosong
+              mainAxisSize: pw.MainAxisSize.min,
               children: [
-                // LOGIKA: Jika ini halaman terakhir, tampilkan Tanda Tangan
                 if (context.pageNumber == context.pagesCount) ...[
-                   pw.SizedBox(height: 30), // Spasi pemisah dari konten rapor
+                   pw.SizedBox(height: 30),
                    PdfHelperService.buildSignatureFooter(
                      rapor: raporData.value!,
-                     namaKepalaSekolah: namaKepalaSekolah.value, // Ambil dari .obs
+                     namaKepalaSekolah: namaKepalaSekolah.value,
                      regularFont: regularFont,
                      boldFont: boldFont,
                    ),
-                   pw.SizedBox(height: 20), // Spasi kecil ke nomor halaman
+                   pw.SizedBox(height: 20),
                 ],
-                
-                // Nomor Halaman (Muncul di semua halaman)
                 PdfHelperService.buildFooter(context, regularFont),
               ]
             );
           },
           
-          // KONTEN UTAMA
+          // [PENTING] Set Text Direction untuk support RTL (Right to Left) otomatis jika diperlukan
+          textDirection: pw.TextDirection.ltr, 
           build: (context) => contentWidgets,
         ),
       );

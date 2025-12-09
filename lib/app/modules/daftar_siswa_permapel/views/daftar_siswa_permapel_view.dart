@@ -15,7 +15,7 @@ class DaftarSiswaPermapelView extends GetView<DaftarSiswaPermapelController> {
         title: Column(
           children: [
             Text(controller.namaMapel, style: const TextStyle(fontSize: 18)),
-            Text(controller.idKelas, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+            Text(controller.idKelas, style: const TextStyle(fontSize: 14, color: Colors.indigo)), // Warna sedikit pudar
           ],
         ),
         centerTitle: true,
@@ -25,24 +25,63 @@ class DaftarSiswaPermapelView extends GetView<DaftarSiswaPermapelController> {
             tooltip: "Manajemen Tugas & Penilaian",
             onPressed: () => controller.goToManajemenTugas(),
           ),
-        Obx(() {
+          
+          // [REVISI: MENU DROP DOWN WALI KELAS]
+          Obx(() {
             if (controller.isWaliKelas.value) {
-              return Row( // Bungkus dengan Row
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.leaderboard_rounded, color: Colors.grey[800]), // Ikon Ranking
-                    tooltip: "Evaluasi & Peringkat Kelas",
-                    onPressed: controller.showRankingDialog,
+              return PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert), // Titik Tiga Vertikal
+                tooltip: "Menu Wali Kelas",
+                onSelected: (value) {
+                  switch (value) {
+                    case 'ranking':
+                      controller.showRankingDialog();
+                      break;
+                    case 'catatan':
+                      controller.showCatatanRaporDialog();
+                      break;
+                    case 'generate':
+                      controller.confirmGenerateMassal();
+                      break;
+                    case 'absen_manual':
+                      controller.showInputAbsensiMassalDialog();
+                      break;
+                  }
+                },
+                itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                  const PopupMenuItem<String>(
+                    value: 'ranking',
+                    child: ListTile(
+                      leading: Icon(Icons.leaderboard_rounded, color: Colors.amber),
+                      title: Text('Peringkat Kelas'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.edit_document),
-                    tooltip: "Tulis Catatan Rapor",
-                    onPressed: controller.showCatatanRaporDialog,
+                  const PopupMenuItem<String>(
+                    value: 'catatan',
+                    child: ListTile(
+                      leading: Icon(Icons.edit_note_rounded, color: Colors.blue),
+                      title: Text('Catatan Rapor'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.sync_rounded),
-                    tooltip: "Generate Massal (Ranking)",
-                    onPressed: controller.confirmGenerateMassal,
+                  const PopupMenuItem<String>(
+                    value: 'generate',
+                    child: ListTile(
+                      leading: Icon(Icons.sync_rounded, color: Colors.green),
+                      title: Text('Update Rapor Massal'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  const PopupMenuDivider(),
+                  const PopupMenuItem<String>(
+                    value: 'absen_manual',
+                    child: ListTile(
+                      leading: Icon(Icons.playlist_add_check_circle_outlined, color: Colors.red),
+                      title: Text('Input Absensi Dadakan'),
+                      subtitle: Text("Manual S/I/A", style: TextStyle(fontSize: 10)),
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
                 ],
               );

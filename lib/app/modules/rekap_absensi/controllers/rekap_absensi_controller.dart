@@ -100,6 +100,7 @@ class RekapAbsensiController extends GetxController {
     if (selectedKelasId.value == null) return;
     isLoading.value = true;
     try {
+      // 1. Fetch Data Harian (Logika Lama - Tetap Jalan)
       final startDate = DateTime(selectedYear.value, selectedMonth.value, 1);
       final endDate = DateTime(selectedYear.value, selectedMonth.value + 1, 0);
 
@@ -115,15 +116,112 @@ class RekapAbsensiController extends GetxController {
           .get();
 
       rekapDataHarian.assignAll(snapshot.docs.map((doc) => AbsensiRekapModel.fromFirestore(doc)).toList());
-      _calculateTotalRekap();
-      _calculateRekapPerSiswa(); // [BARU] Panggil fungsi kalkulasi per siswa
+      
+      // 2. Fetch Data Manual Semester (LOGIKA BARU)
+      // Kita perlu mengambil daftar siswa di kelas ini dulu
+      final siswaSnap = await _firestore
+          .collection('Sekolah').doc(configC.idSekolah)
+          .collection('tahunajaran').doc(configC.tahunAjaranAktif.value)
+          .collection('kelastahunajaran').doc(selectedKelasId.value)
+          .collection('daftarsiswa')
+          .get();
+      
+      // Map untuk menyimpan data manual: {'uid': {s:1, i:0, a:2}}
+      final Map<String, Map<String, int>> manualDataMap = {};
+
+      // Fetch parallel dokumen semester per siswa
+      await Future.wait(siswaSnap.docs.map((doc) async {
+        final semDoc = await doc.reference.collection('semester').doc(configC.semesterAktif.value).get();
+        if (semDoc.exists) {
+          final manual = semDoc.data()?['rekapAbsensiManual'];
+          if (manual != null) {
+            manualDataMap[doc.id] = {
+              'sakit': (manual['sakit'] as num?)?.toInt() ?? 0,
+              'izin': (manual['izin'] as num?)?.toInt() ?? 0,
+              'alfa': (manual['alfa'] as num?)?.toInt() ?? 0, // 'alfa' atau 'alpa' sesuaikan key
+            };
+          }
+        }
+      }));
+
+      // 3. Kalkulasi Gabungan
+      _calculateTotalRekap(); // Hitung total dari harian dulu
+      _calculateRekapPerSiswa(manualDataMap, siswaSnap.docs); // Pass data manual & daftar siswa
 
     } catch (e) { 
-      Get.snackbar("Error", "Gagal memuat rekap: $e"); 
       print("Gagal memuat rekap: $e");
-      } 
-    
-    finally { isLoading.value = false; }
+    } finally { isLoading.value = false; }
+  }
+
+  // REVISI FUNGSI KALKULASI PER SISWA
+  // REVISI FUNGSI KALKULASI (FILTER ONLY S.I.A)
+  void _calculateRekapPerSiswa(
+    Map<String, Map<String, int>> manualDataMap, 
+    List<QueryDocumentSnapshot> daftarSiswaDocs
+  ) {
+      final Map<String, SiswaAbsensiRekap> siswaMap = {};
+
+      // 1. Masukkan Data dari Harian (Otomatis)
+      for (var rekapHarian in rekapDataHarian) {
+          rekapHarian.siswa.forEach((uid, data) {
+              final status = data['status'] as String?;
+              // Hanya proses jika status BUKAN Hadir
+              if (status != 'Hadir') {
+                  if (!siswaMap.containsKey(uid)) {
+                      String nama = data['nama'] ?? 'Tanpa Nama';
+                      siswaMap[uid] = SiswaAbsensiRekap(nama: nama);
+                  }
+
+                  if (status == 'Sakit') siswaMap[uid]!.sakit++;
+                  else if (status == 'Izin') siswaMap[uid]!.izin++;
+                  else if (status == 'Alfa') siswaMap[uid]!.alfa++;
+              }
+          });
+      }
+
+      // 2. OVERRIDE dengan Data Manual (Dadakan)
+      manualDataMap.forEach((uid, dataManual) {
+        // Cek apakah siswa ini punya S/I/A > 0?
+        // Jika manualnya 0 semua, kita tidak perlu menambahkannya ke map (kecuali mau menimpa data harian jadi 0)
+        
+        // Logika: Kita cari nama dulu
+        final siswaDoc = daftarSiswaDocs.firstWhere((d) => d.id == uid, orElse: () => daftarSiswaDocs.first); 
+        String nama = (siswaDoc.data() as Map<String, dynamic>)['namaLengkap'] ?? 'Siswa';
+
+        // Reset/Timpa data di map dengan data manual
+        siswaMap[uid] = SiswaAbsensiRekap(nama: nama); 
+        siswaMap[uid]!.sakit = dataManual['sakit']!;
+        siswaMap[uid]!.izin = dataManual['izin']!;
+        siswaMap[uid]!.alfa = dataManual['alfa']!;
+      });
+
+      // 3. [FILTER UTAMA] Hapus siswa yang S, I, dan A nya KOSONG SEMUA
+      // Kita konversi ke list, lalu filter.
+      final filteredList = siswaMap.values.where((siswa) {
+        // Tampilkan hanya jika salah satu ada isinya
+        return siswa.sakit > 0 || siswa.izin > 0 || siswa.alfa > 0;
+      }).toList();
+
+      // 4. Sortir berdasarkan Nama
+      filteredList.sort((a, b) => a.nama.compareTo(b.nama));
+      
+      // 5. Assign ke Observable
+      rekapPerSiswa.assignAll(filteredList);
+      
+      // 6. Update Total Rekap (Untuk Header)
+      int tS = 0, tI = 0, tA = 0;
+      // Kita hitung dari filteredList (hasilnya sama saja dengan raw, karena 0 tetap 0)
+      for (var s in filteredList) {
+        tS += s.sakit; 
+        tI += s.izin; 
+        tA += s.alfa;
+      }
+      
+      // Update state total agar di grafik/header juga sinkron
+      totalRekap['sakit'] = tS; 
+      totalRekap['izin'] = tI; 
+      totalRekap['alfa'] = tA;
+      // Total 'hadir' kita biarkan dari hitungan harian atau diabaikan karena fokusnya ke ketidakhadiran
   }
 
   void _calculateTotalRekap() {
@@ -140,32 +238,73 @@ class RekapAbsensiController extends GetxController {
     totalRekap['izin'] = izin;
     totalRekap['alfa'] = alfa;
   }
+
+
+  //--------------------------------------------------------------
+  // REKAP ABSENSI LAMA (SEBELUM FITUR MANUAL)
+  //--------------------------------------------------------------
+
+  // Future<void> fetchRekapData() async {
+  //   if (selectedKelasId.value == null) return;
+  //   isLoading.value = true;
+  //   try {
+  //     final startDate = DateTime(selectedYear.value, selectedMonth.value, 1);
+  //     final endDate = DateTime(selectedYear.value, selectedMonth.value + 1, 0);
+
+  //     final snapshot = await _firestore
+  //         .collection('Sekolah').doc(configC.idSekolah)
+  //         .collection('tahunajaran').doc(configC.tahunAjaranAktif.value)
+  //         .collection('kelastahunajaran').doc(selectedKelasId.value)
+  //         .collection('semester').doc(configC.semesterAktif.value)
+  //         .collection('absensi')
+  //         .where('tanggal', isGreaterThanOrEqualTo: startDate)
+  //         .where('tanggal', isLessThanOrEqualTo: endDate)
+  //         .orderBy('tanggal', descending: true)
+  //         .get();
+
+  //     rekapDataHarian.assignAll(snapshot.docs.map((doc) => AbsensiRekapModel.fromFirestore(doc)).toList());
+  //     _calculateTotalRekap();
+  //     _calculateRekapPerSiswa(); // [BARU] Panggil fungsi kalkulasi per siswa
+
+  //   } catch (e) { 
+  //     Get.snackbar("Error", "Gagal memuat rekap: $e"); 
+  //     print("Gagal memuat rekap: $e");
+  //     } 
+    
+  //   finally { isLoading.value = false; }
+  // }
   
-  // [FUNGSI BARU] Untuk menghitung rekap per siswa
-  void _calculateRekapPerSiswa() {
-      final Map<String, SiswaAbsensiRekap> siswaMap = {};
+  //// [FUNGSI BARU] Untuk menghitung rekap per siswa
+  // void _calculateRekapPerSiswa() {
+  //     final Map<String, SiswaAbsensiRekap> siswaMap = {};
 
-      for (var rekapHarian in rekapDataHarian) {
-          rekapHarian.siswa.forEach((uid, data) {
-              final status = data['status'] as String?;
-              if (status != 'Hadir') {
-                  final nama = data['nama'] as String? ?? 'Tanpa Nama';
+  //     for (var rekapHarian in rekapDataHarian) {
+  //         rekapHarian.siswa.forEach((uid, data) {
+  //             final status = data['status'] as String?;
+  //             if (status != 'Hadir') {
+  //                 final nama = data['nama'] as String? ?? 'Tanpa Nama';
                   
-                  // Inisialisasi jika siswa belum ada di map
-                  if (!siswaMap.containsKey(uid)) {
-                      siswaMap[uid] = SiswaAbsensiRekap(nama: nama);
-                  }
+  //                 // Inisialisasi jika siswa belum ada di map
+  //                 if (!siswaMap.containsKey(uid)) {
+  //                     siswaMap[uid] = SiswaAbsensiRekap(nama: nama);
+  //                 }
 
-                  // Tambah counter berdasarkan status
-                  if (status == 'Sakit') siswaMap[uid]!.sakit++;
-                  if (status == 'Izin') siswaMap[uid]!.izin++;
-                  if (status == 'Alfa') siswaMap[uid]!.alfa++;
-              }
-          });
-      }
-      // Konversi map ke list dan urutkan berdasarkan nama
-      rekapPerSiswa.assignAll(siswaMap.values.toList()..sort((a,b) => a.nama.compareTo(b.nama)));
-  }
+  //                 // Tambah counter berdasarkan status
+  //                 if (status == 'Sakit') siswaMap[uid]!.sakit++;
+  //                 if (status == 'Izin') siswaMap[uid]!.izin++;
+  //                 if (status == 'Alfa') siswaMap[uid]!.alfa++;
+  //             }
+  //         });
+  //     }
+  //     // Konversi map ke list dan urutkan berdasarkan nama
+  //     rekapPerSiswa.assignAll(siswaMap.values.toList()..sort((a,b) => a.nama.compareTo(b.nama)));
+  // }
+
+  //--------------------------------------------------------------
+  // AKHIR REKAP ABSENSI LAMA
+  //--------------------------------------------------------------
+
+
 
   Future<void> exportPdf() async {
     if (rekapDataHarian.isEmpty) {
