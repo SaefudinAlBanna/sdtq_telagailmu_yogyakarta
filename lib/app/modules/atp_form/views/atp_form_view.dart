@@ -175,31 +175,87 @@ class _UnitCard extends GetView<AtpFormController> {
     required RxList<String> list,
   }) {
     final textController = TextEditingController();
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(title, style: Get.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
-        Obx(() => ListView.builder(
+        
+        // [REVISI] List Item dengan Tombol Edit
+        Obx(() => ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: list.length,
+              separatorBuilder: (ctx, idx) => const Divider(height: 1),
               itemBuilder: (ctx, idx) => ListTile(
                 dense: true,
-                leading: Text("${idx + 1}."),
+                contentPadding: EdgeInsets.zero, // Rapatkan padding agar muat
+                leading: CircleAvatar(
+                  radius: 12,
+                  backgroundColor: Colors.grey.shade200,
+                  child: Text("${idx + 1}", style: const TextStyle(fontSize: 12, color: Colors.black)),
+                ),
                 title: Text(list[idx]),
-                trailing: IconButton(
-                  icon: const Icon(Icons.remove_circle_outline, size: 20, color: Colors.red),
-                  onPressed: () => list.removeAt(idx),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // TOMBOL EDIT (BARU)
+                    IconButton(
+                      icon: const Icon(Icons.edit_rounded, size: 20, color: Colors.blue),
+                      tooltip: "Edit TP",
+                      onPressed: () {
+                        // Tampilkan Dialog Edit
+                        final editCtrl = TextEditingController(text: list[idx]);
+                        Get.defaultDialog(
+                          title: "Edit Tujuan Pembelajaran",
+                          contentPadding: const EdgeInsets.all(16),
+                          content: TextField(
+                            controller: editCtrl,
+                            autofocus: true,
+                            maxLines: 3,
+                            decoration: const InputDecoration(
+                              labelText: "Redaksi TP",
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                          textConfirm: "Simpan Perubahan",
+                          textCancel: "Batal",
+                          confirmTextColor: Colors.white,
+                          onConfirm: () {
+                            if (editCtrl.text.trim().isNotEmpty) {
+                              list[idx] = editCtrl.text.trim(); // Update data di index yg sama
+                              Get.back(); // Tutup dialog
+                            }
+                          },
+                        );
+                      },
+                    ),
+                    
+                    // TOMBOL HAPUS (LAMA)
+                    IconButton(
+                      icon: const Icon(Icons.remove_circle_outline, size: 20, color: Colors.red),
+                      tooltip: "Hapus TP",
+                      onPressed: () => list.removeAt(idx),
+                    ),
+                  ],
                 ),
               ),
             )),
-        const SizedBox(height: 8),
+            
+        const SizedBox(height: 12),
+        
+        // Input Tambah Baru (Tetap Sama)
         Row(
           children: [
             Expanded(child: TextField(
               controller: textController,
-              decoration: const InputDecoration(labelText: 'Tambah baru...', border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                labelText: 'Tambah TP baru...', 
+                hintText: 'Ketik lalu tekan enter atau (+)',
+                border: OutlineInputBorder(),
+                isDense: true, // Lebih ramping
+              ),
               onSubmitted: (value) {
                 if (value.isNotEmpty) {
                   list.add(value);
